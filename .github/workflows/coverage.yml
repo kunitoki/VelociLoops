@@ -1,0 +1,69 @@
+name: coverage
+
+on:
+  push:
+    branches:
+      - main
+      - dev/**
+    paths:
+      - "**/workflows/coverage.yml"
+      - "**/include/**"
+      - "**/src/**"
+      - "**/tests/**"
+      - "**/CMakeLists.txt"
+      - "!**/*.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install lcov
+        run: sudo apt-get install -y lcov
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DVELOCILOOPS_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Collect Coverage
+        run: |
+          lcov -c -d build \
+            --ignore-errors mismatch,unused,inconsistent,unsupported \
+            --include "*/src/*" \
+            -o build/coverage.info
+
+      - name: Check Coverage
+        run: |
+          lcov --summary build/coverage.info \
+            --ignore-errors inconsistent,unsupported
+
+      - name: Generate HTML Report
+        run: genhtml build/coverage.info --ignore-errors category,inconsistent,unsupported -o build/coverage_html
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: build/coverage_html
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          file: build/coverage.info
+          format: lcov
+          github-token: ${{ secrets.GITHUB_TOKEN }}

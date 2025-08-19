@@ -1,0 +1,53 @@
+name: fuzzing
+
+on:
+  push:
+    branches:
+      - main
+      - dev/**
+    paths:
+      - "**/workflows/fuzz.yml"
+      - "**/include/**"
+      - "**/src/**"
+      - "**/tests/**"
+      - "**/CMakeLists.txt"
+      - "!**/*.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-fuzz \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DVELOCILOOPS_SANITIZERS=ON \
+            -DVELOCILOOPS_ENABLE_FUZZING=ON
+
+      - name: Build
+        run: cmake --build build-fuzz --parallel $(nproc) --target velociloops_fuzzer
+
+      - name: Fuzz
+        run: |
+          ./build-fuzz/tests/velociloops_fuzzer \
+            tests/fuzz/ \
+            -max_total_time=60 \
+            -max_len=980128 \
+            -rss_limit_mb=512 \
+            tests/data/
+        env:
+          ASAN_OPTIONS: halt_on_error=1:detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
