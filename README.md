@@ -111,9 +111,10 @@ implemented.
 
 ## Waveform Comparison
 
-ReCycle output vs VelociLoops output for `120Stereo.rx2`:
-
+ReCycle output for `120Stereo.rx2`:
 ![ReCycle](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/sound_recycle.jpg?x=2)
+
+VelociLoops output for `120Stereo.rx2`:
 ![VelociLoops](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/sound_velociloops.jpg?x=2)
 
 ---
