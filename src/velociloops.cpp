@@ -447,8 +447,7 @@ private:
                 return nd0;
             }
 
-            default:
-                return d0; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
+            default: return d0; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -585,23 +584,17 @@ private:
     {
         switch (idx)
         {
-            case 0:
-                return sample2x;
+            case 0: return sample2x;
 
-            case 1:
-                return sample2x - d[0];
+            case 1: return sample2x - d[0];
 
-            case 2:
-                return sample2x - d[0] - d[1];
+            case 2: return sample2x - d[0] - d[1];
 
-            case 3:
-                return sample2x - d[0] - d[1] - d[2];
+            case 3: return sample2x - d[0] - d[1] - d[2];
 
-            case 4:
-                return sample2x - d[0] - d[1] - d[2] - d[3];
+            case 4: return sample2x - d[0] - d[1] - d[2] - d[3];
 
-            default:
-                return sample2x; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
+            default: return sample2x; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -664,8 +657,7 @@ private:
                 return nd0;
             }
 
-            default:
-                return d[0]; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
+            default: return d[0]; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -1187,25 +1179,15 @@ private:
 
         switch (bd)
         {
-            case 1:
-                info.bit_depth = 8;
-                break;
+            case 1: info.bit_depth = 8; break;
 
-            case 3:
-                info.bit_depth = 16;
-                break;
+            case 3: info.bit_depth = 16; break;
 
-            case 5:
-                info.bit_depth = 24;
-                break;
+            case 5: info.bit_depth = 24; break;
 
-            case 7:
-                info.bit_depth = 32;
-                break;
+            case 7: info.bit_depth = 32; break;
 
-            default:
-                info.bit_depth = 16;
-                break;
+            default: info.bit_depth = 16; break;
         }
 
         const uint32_t frames = (loopEnd > loopStart) ? (loopEnd - loopStart) : totalFrames;
@@ -1496,20 +1478,15 @@ static uint8_t bitDepthCode(int32_t bitDepth)
 {
     switch (bitDepth)
     {
-        case 8:
-            return 1; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        case 8: return 1; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
 
-        case 16:
-            return 3;
+        case 16: return 3;
 
-        case 24:
-            return 5; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        case 24: return 5; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
 
-        case 32:
-            return 7; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        case 32: return 7; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
 
-        default:
-            return 3; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        default: return 3; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
     }
 }
 
@@ -2314,32 +2291,19 @@ const char* vl_error_string(VLError err)
 {
     switch (err)
     {
-        case VL_OK:
-            return "OK";
-        case VL_ERROR_INVALID_HANDLE:
-            return "invalid handle";
-        case VL_ERROR_INVALID_ARG:
-            return "invalid argument";
-        case VL_ERROR_FILE_NOT_FOUND:
-            return "file not found";
-        case VL_ERROR_FILE_CORRUPT:
-            return "file corrupt or unsupported format";
-        case VL_ERROR_OUT_OF_MEMORY:
-            return "out of memory";
-        case VL_ERROR_INVALID_SLICE:
-            return "invalid slice index";
-        case VL_ERROR_INVALID_SAMPLE_RATE:
-            return "invalid sample rate";
-        case VL_ERROR_BUFFER_TOO_SMALL:
-            return "buffer too small";
-        case VL_ERROR_NO_CREATOR_INFO:
-            return "no creator info available";
-        case VL_ERROR_NOT_IMPLEMENTED:
-            return "not implemented";
-        case VL_ERROR_ALREADY_HAS_DATA:
-            return "already has data";
-        default:
-            return "unknown error";
+        case VL_OK: return "OK";
+        case VL_ERROR_INVALID_HANDLE: return "invalid handle";
+        case VL_ERROR_INVALID_ARG: return "invalid argument";
+        case VL_ERROR_FILE_NOT_FOUND: return "file not found";
+        case VL_ERROR_FILE_CORRUPT: return "file corrupt or unsupported format";
+        case VL_ERROR_OUT_OF_MEMORY: return "out of memory";
+        case VL_ERROR_INVALID_SLICE: return "invalid slice index";
+        case VL_ERROR_INVALID_SAMPLE_RATE: return "invalid sample rate";
+        case VL_ERROR_BUFFER_TOO_SMALL: return "buffer too small";
+        case VL_ERROR_NO_CREATOR_INFO: return "no creator info available";
+        case VL_ERROR_NOT_IMPLEMENTED: return "not implemented";
+        case VL_ERROR_ALREADY_HAS_DATA: return "already has data";
+        default: return "unknown error";
     }
 }
 
