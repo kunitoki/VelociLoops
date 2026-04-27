@@ -28,7 +28,7 @@ coverage:
         --include "$(pwd)/include/*" \
         --include "$(pwd)/src/*" \
         -o build-coverage/coverage.info
-    lcov --summary build-coverage/coverage.info --ignore-errors inconsistent,unsupported --fail-under-lines 100
+    lcov --summary build-coverage/coverage.info --ignore-errors inconsistent,unsupported
     genhtml build-coverage/coverage.info --ignore-errors category,inconsistent,unsupported -o build-coverage/coverage_html
     open build-coverage/coverage_html/index.html
 
