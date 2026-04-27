@@ -418,8 +418,7 @@ int32_t vl_get_slice_frame_count(VLFile file, int32_t index);
  *                   VL_ERROR_INVALID_SLICE for an out-of-range index.
  *                   VL_ERROR_INVALID_ARG if @p left is NULL.
  */
-VLError vl_decode_slice(VLFile file, int32_t index, float* left, float* right, int32_t capacity,
-                        int32_t* frames_out);
+VLError vl_decode_slice(VLFile file, int32_t index, float* left, float* right, int32_t capacity, int32_t* frames_out);
 
 /* -----------------------------------------------------------------------
    Write: assembly from audio slices
@@ -468,8 +467,7 @@ VLError vl_set_creator_info(VLFile file, const VLCreatorInfo* info);
  * @return       The assigned slice index (>= 0) on success, or a negative
  *               VLError code on failure.
  */
-int32_t vl_add_slice(VLFile file, int32_t ppq_pos, const float* left, const float* right,
-                     int32_t frames);
+int32_t vl_add_slice(VLFile file, int32_t ppq_pos, const float* left, const float* right, int32_t frames);
 
 /**
  * @brief Remove a slice by index, shifting subsequent indices down.

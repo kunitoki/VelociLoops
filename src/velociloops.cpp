@@ -887,6 +887,117 @@ struct VLSliceEntry
     bool synthetic_leading = false;
 };
 
+template <typename T> class VLHeapArray
+{
+public:
+    VLHeapArray() = default;
+
+    VLHeapArray(const VLHeapArray&) = delete;
+    VLHeapArray& operator=(const VLHeapArray&) = delete;
+
+    VLHeapArray(VLHeapArray&& o) noexcept : ptr_(std::move(o.ptr_)), size_(o.size_)
+    {
+        o.size_ = 0;
+    }
+
+    VLHeapArray& operator=(VLHeapArray&& o) noexcept
+    {
+        ptr_ = std::move(o.ptr_);
+        size_ = o.size_;
+        o.size_ = 0;
+        return *this;
+    }
+
+    [[nodiscard]] bool assign(std::size_t n, T val) noexcept
+    {
+        if (n == 0)
+        {
+            ptr_.reset();
+            size_ = 0;
+            return true;
+        }
+
+        T* raw = new (std::nothrow) T[n];
+        if (!raw)
+            return false;
+
+        std::fill_n(raw, n, val);
+        ptr_.reset(raw);
+        size_ = n;
+
+        return true;
+    }
+
+    [[nodiscard]] bool resize(std::size_t n, T val) noexcept
+    {
+        if (n == size_)
+            return true;
+
+        if (n == 0)
+        {
+            ptr_.reset();
+            size_ = 0;
+            return true;
+        }
+
+        T* raw = new (std::nothrow) T[n];
+        if (!raw)
+            return false;
+
+        const std::size_t keep = std::min(size_, n);
+        if (keep)
+            std::memcpy(raw, ptr_.get(), keep * sizeof(T));
+
+        if (n > size_)
+            std::fill_n(raw + size_, n - size_, val);
+
+        ptr_.reset(raw);
+        size_ = n;
+        return true;
+    }
+
+    T& operator[](std::size_t i) noexcept
+    {
+        assert(i < size_);
+        return ptr_[i];
+    }
+
+    const T& operator[](std::size_t i) const noexcept
+    {
+        assert(i < size_);
+        return ptr_[i];
+    }
+
+    T* data() noexcept
+    {
+        return ptr_.get();
+    }
+
+    const T* data() const noexcept
+    {
+        return ptr_.get();
+    }
+
+    std::size_t size() const noexcept
+    {
+        return size_;
+    }
+
+    bool empty() const noexcept
+    {
+        return size_ == 0;
+    }
+
+    static constexpr std::size_t max_size() noexcept
+    {
+        return std::numeric_limits<std::size_t>::max() / sizeof(T);
+    }
+
+private:
+    std::unique_ptr<T[]> ptr_;
+    std::size_t size_ = 0;
+};
+
 class VLFileImpl
 {
 public:
@@ -894,7 +1005,7 @@ public:
     VLCreatorInfo creator = {};
     std::vector<VLSliceEntry> slices;
     std::vector<uint8_t> fileData;
-    std::vector<int16_t> pcm;
+    VLHeapArray<int16_t> pcm;
     uint32_t totalFrames = 0;
     uint32_t loopStart = 0;
     uint32_t loopEnd = 0;
@@ -965,14 +1076,8 @@ public:
 
         const size_t pcmElements = (size_t)totalFrames * (size_t)info.channels;
 
-        try
-        {
-            pcm.assign(pcmElements, 0);
-        }
-        catch (const std::bad_alloc&)
-        {
+        if (!pcm.assign(pcmElements, 0))
             return false;
-        }
 
         VLDWOPDecompressor dec;
         dec.init(&fileData[dwopOffset], dwopSize);
@@ -2059,7 +2164,8 @@ static int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_
         return (int32_t)VL_ERROR_OUT_OF_MEMORY; // LCOV_EXCL_LINE max_size is not reachable in tests.
 
     if (file->impl.pcm.size() < required)
-        file->impl.pcm.resize(required, 0);
+        if (!file->impl.pcm.resize(required, 0))
+            return (int32_t)VL_ERROR_OUT_OF_MEMORY;
 
     for (int32_t f = 0; f < frames; ++f)
     {
