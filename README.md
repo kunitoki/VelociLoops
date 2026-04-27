@@ -1,8 +1,9 @@
-![VelociLoops](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/backdrop.jpg)
+![VelociLoops](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/backdrop.jpg?x=1)
 
 # VelociLoops
 
-[![Tests](https://github.com/kunitoki/VelociLoops/actions/workflows/tests.yml/badge.svg)](https://github.com/kunitoki/VelociLoops/actions/workflows/tests.yml)
+[![Tests](https://github.com/kunitoki/VelociLoops/actions/workflows/tests.yml/badge.svg?x=1)](https://github.com/kunitoki/VelociLoops/actions/workflows/tests.yml)
+[![Coverage Status](https://coveralls.io/repos/github/kunitoki/VelociLoops/badge.svg?x=1&branch=main)](https://coveralls.io/github/kunitoki/VelociLoops?branch=main)
 
 A C library for reading and writing **REX2** (`.rx2`) audio loop files.
 
