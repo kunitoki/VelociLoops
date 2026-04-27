@@ -24,3 +24,22 @@ if (VELOCILOOPS_COVERAGE)
     target_compile_options(velociloops_tests PRIVATE --coverage)
     target_link_options(velociloops_tests PRIVATE --coverage)
 endif()
+
+if (VELOCILOOPS_SANITIZERS)
+    target_compile_options(velociloops_tests PRIVATE
+        -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(velociloops_tests PRIVATE
+        -fsanitize=address,undefined)
+endif()
+
+if (VELOCILOOPS_ENABLE_FUZZING)
+    add_executable(velociloops_fuzzer fuzz_velociloops.cpp)
+    target_link_libraries(velociloops_fuzzer PRIVATE velociloops_static)
+    target_compile_features(velociloops_fuzzer PRIVATE cxx_std_17)
+    target_compile_definitions(velociloops_fuzzer
+        PRIVATE VELOCILOOPS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+    target_compile_options(velociloops_fuzzer PRIVATE
+        -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g)
+    target_link_options(velociloops_fuzzer PRIVATE
+        -fsanitize=fuzzer,address,undefined)
+endif()

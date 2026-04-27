@@ -44,7 +44,8 @@
 #pragma once
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include <stddef.h>
@@ -69,25 +70,26 @@ typedef struct VLFile_s* VLFile;
  * Zero (VL_OK) indicates success; every negative value is a distinct failure
  * reason.  Use vl_error_string() to obtain a human-readable description.
  */
-typedef enum {
-    VL_OK                        =  0, /**< Success. */
-    VL_ERROR_INVALID_HANDLE      = -1, /**< NULL or already-closed VLFile passed. */
-    VL_ERROR_INVALID_ARG         = -2, /**< A required pointer argument was NULL or a
+typedef enum
+{
+    VL_OK = 0,                         /**< Success. */
+    VL_ERROR_INVALID_HANDLE = -1,      /**< NULL or already-closed VLFile passed. */
+    VL_ERROR_INVALID_ARG = -2,         /**< A required pointer argument was NULL or a
                                              numeric argument was out of range. */
-    VL_ERROR_FILE_NOT_FOUND      = -3, /**< Path does not exist or cannot be opened. */
-    VL_ERROR_FILE_CORRUPT        = -4, /**< IFF/DWOP structure is malformed or
+    VL_ERROR_FILE_NOT_FOUND = -3,      /**< Path does not exist or cannot be opened. */
+    VL_ERROR_FILE_CORRUPT = -4,        /**< IFF/DWOP structure is malformed or
                                              mandatory chunks are missing. */
-    VL_ERROR_OUT_OF_MEMORY       = -5, /**< Heap allocation failed. */
-    VL_ERROR_INVALID_SLICE       = -6, /**< Slice index is negative or >= slice_count. */
+    VL_ERROR_OUT_OF_MEMORY = -5,       /**< Heap allocation failed. */
+    VL_ERROR_INVALID_SLICE = -6,       /**< Slice index is negative or >= slice_count. */
     VL_ERROR_INVALID_SAMPLE_RATE = -7, /**< Sample rate is zero, negative, or
                                              unsupported for the requested operation. */
-    VL_ERROR_BUFFER_TOO_SMALL    = -8, /**< Caller-supplied buffer capacity is less than
+    VL_ERROR_BUFFER_TOO_SMALL = -8,    /**< Caller-supplied buffer capacity is less than
                                              vl_get_slice_frame_count() for that slice. */
-    VL_ERROR_NO_CREATOR_INFO     = -9, /**< The file has no CREI chunk; creator info
+    VL_ERROR_NO_CREATOR_INFO = -9,     /**< The file has no CREI chunk; creator info
                                              cannot be read. */
-    VL_ERROR_NOT_IMPLEMENTED     = -10,/**< Feature is parsed/stored but not yet
+    VL_ERROR_NOT_IMPLEMENTED = -10,    /**< Feature is parsed/stored but not yet
                                              functional (e.g. resampling). */
-    VL_ERROR_ALREADY_HAS_DATA    = -11,/**< vl_set_info() or vl_set_creator_info() was
+    VL_ERROR_ALREADY_HAS_DATA = -11,   /**< vl_set_info() or vl_set_creator_info() was
                                              called after slices were already added. */
 } VLError;
 
@@ -102,10 +104,11 @@ typedef enum {
  * order.  When creating a new file, fill this struct and pass it to
  * vl_set_info() before adding slices.
  */
-typedef struct {
-    int32_t channels;        /**< Channel count: 1 = mono, 2 = stereo. */
-    int32_t sample_rate;     /**< Native sample rate in Hz (e.g. 44100, 48000). */
-    int32_t slice_count;     /**< Number of slices in the file. */
+typedef struct
+{
+    int32_t channels;    /**< Channel count: 1 = mono, 2 = stereo. */
+    int32_t sample_rate; /**< Native sample rate in Hz (e.g. 44100, 48000). */
+    int32_t slice_count; /**< Number of slices in the file. */
 
     /**
      * @brief Playback tempo in units of BPM × 1000.
@@ -137,9 +140,9 @@ typedef struct {
      */
     int32_t ppq_length;
 
-    int32_t time_sig_num;    /**< Time-signature numerator (e.g. 4 for 4/4). */
-    int32_t time_sig_den;    /**< Time-signature denominator (e.g. 4 for 4/4). */
-    int32_t bit_depth;       /**< Source bit depth: 16 or 24. */
+    int32_t time_sig_num; /**< Time-signature numerator (e.g. 4 for 4/4). */
+    int32_t time_sig_den; /**< Time-signature denominator (e.g. 4 for 4/4). */
+    int32_t bit_depth;    /**< Source bit depth: 16 or 24. */
 
     /**
      * @brief Total PCM frame count decoded from the SDAT/DWOP payload.
@@ -214,7 +217,8 @@ typedef struct {
  *
  * Populated by vl_get_slice_info().  Indices are zero-based.
  */
-typedef struct {
+typedef struct
+{
     /**
      * @brief Slice position in PPQ ticks from the loop start.
      *
@@ -248,12 +252,13 @@ typedef struct {
  * strings.  Fields absent in the file are returned as empty strings ("").
  * Returns VL_ERROR_NO_CREATOR_INFO when the file contains no CREI chunk.
  */
-typedef struct {
-    char name[256];       /**< Creator or artist name. */
-    char copyright[256];  /**< Copyright notice. */
-    char url[256];        /**< Creator website URL. */
-    char email[256];      /**< Creator contact e-mail. */
-    char free_text[256];  /**< Arbitrary free-form text. */
+typedef struct
+{
+    char name[256];      /**< Creator or artist name. */
+    char copyright[256]; /**< Copyright notice. */
+    char url[256];       /**< Creator website URL. */
+    char email[256];     /**< Creator contact e-mail. */
+    char free_text[256]; /**< Arbitrary free-form text. */
 } VLCreatorInfo;
 
 /* -----------------------------------------------------------------------
@@ -273,7 +278,7 @@ typedef struct {
  * @return      A valid VLFile handle, or NULL on failure.
  *              Always call vl_close() on a non-NULL return value.
  */
-VLFile    vl_open(const char* path, VLError* err);
+VLFile vl_open(const char* path, VLError* err);
 
 /**
  * @brief Load and decode a REX2 file from a caller-owned memory buffer.
@@ -287,7 +292,7 @@ VLFile    vl_open(const char* path, VLError* err);
  * @param err   Receives the status code; may be NULL.
  * @return      A valid VLFile handle, or NULL on failure.
  */
-VLFile    vl_open_from_memory(const void* data, size_t size, VLError* err);
+VLFile vl_open_from_memory(const void* data, size_t size, VLError* err);
 
 /**
  * @brief Create a new, empty file handle for assembling a REX2 loop.
@@ -303,15 +308,14 @@ VLFile    vl_open_from_memory(const void* data, size_t size, VLError* err);
  * @param err          Receives the status code; may be NULL.
  * @return             A valid VLFile handle, or NULL on failure.
  */
-VLFile    vl_create_new(int32_t channels, int32_t sample_rate,
-                         int32_t tempo, VLError* err);
+VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLError* err);
 
 /**
  * @brief Release all resources associated with a VLFile handle.
  *
  * The handle is invalid after this call.  Safe to call with NULL (no-op).
  */
-void      vl_close(VLFile file);
+void vl_close(VLFile file);
 
 /* -----------------------------------------------------------------------
    Read: metadata
@@ -325,7 +329,7 @@ void      vl_close(VLFile file);
  *              All integer fields are returned in host byte order.
  * @return      VL_OK, VL_ERROR_INVALID_HANDLE, or VL_ERROR_INVALID_ARG.
  */
-VLError   vl_get_info(VLFile file, VLFileInfo* out);
+VLError vl_get_info(VLFile file, VLFileInfo* out);
 
 /**
  * @brief Retrieve creator/tag metadata from the CREI chunk.
@@ -336,7 +340,7 @@ VLError   vl_get_info(VLFile file, VLFileInfo* out);
  *              VL_ERROR_NO_CREATOR_INFO if the file contains no CREI chunk.
  *              VL_ERROR_INVALID_HANDLE or VL_ERROR_INVALID_ARG on bad input.
  */
-VLError   vl_get_creator_info(VLFile file, VLCreatorInfo* out);
+VLError vl_get_creator_info(VLFile file, VLCreatorInfo* out);
 
 /* -----------------------------------------------------------------------
    Read: slice enumeration
@@ -351,7 +355,7 @@ VLError   vl_get_creator_info(VLFile file, VLCreatorInfo* out);
  * @return       VL_OK on success.
  *               VL_ERROR_INVALID_SLICE if @p index is out of range.
  */
-VLError   vl_get_slice_info(VLFile file, int32_t index, VLSliceInfo* out);
+VLError vl_get_slice_info(VLFile file, int32_t index, VLSliceInfo* out);
 
 /* -----------------------------------------------------------------------
    Read: sample extraction
@@ -370,7 +374,7 @@ VLError   vl_get_slice_info(VLFile file, int32_t index, VLSliceInfo* out);
  *              VL_ERROR_NOT_IMPLEMENTED for any other non-zero rate.
  *              VL_ERROR_INVALID_ARG if @p rate <= 0.
  */
-VLError   vl_set_output_sample_rate(VLFile file, int32_t rate);
+VLError vl_set_output_sample_rate(VLFile file, int32_t rate);
 
 /**
  * @brief Return the number of frames vl_decode_slice() will write for a slice.
@@ -384,7 +388,7 @@ VLError   vl_set_output_sample_rate(VLFile file, int32_t rate);
  * @return       Frame count (>= 1) on success, or a negative VLError code
  *               cast to int32_t (e.g. VL_ERROR_INVALID_SLICE).
  */
-int32_t   vl_get_slice_frame_count(VLFile file, int32_t index);
+int32_t vl_get_slice_frame_count(VLFile file, int32_t index);
 
 /**
  * @brief Decode one slice into caller-supplied float PCM buffers.
@@ -414,9 +418,8 @@ int32_t   vl_get_slice_frame_count(VLFile file, int32_t index);
  *                   VL_ERROR_INVALID_SLICE for an out-of-range index.
  *                   VL_ERROR_INVALID_ARG if @p left is NULL.
  */
-VLError   vl_decode_slice(VLFile file, int32_t index,
-                           float* left, float* right,
-                           int32_t capacity, int32_t* frames_out);
+VLError vl_decode_slice(VLFile file, int32_t index, float* left, float* right, int32_t capacity,
+                        int32_t* frames_out);
 
 /* -----------------------------------------------------------------------
    Write: assembly from audio slices
@@ -435,7 +438,7 @@ VLError   vl_decode_slice(VLFile file, int32_t index,
  * @return      VL_OK, VL_ERROR_INVALID_HANDLE, VL_ERROR_INVALID_ARG, or
  *              VL_ERROR_ALREADY_HAS_DATA.
  */
-VLError   vl_set_info(VLFile file, const VLFileInfo* info);
+VLError vl_set_info(VLFile file, const VLFileInfo* info);
 
 /**
  * @brief Set creator/tag metadata on a handle from vl_create_new().
@@ -448,7 +451,7 @@ VLError   vl_set_info(VLFile file, const VLFileInfo* info);
  * @return      VL_OK, VL_ERROR_INVALID_HANDLE, VL_ERROR_INVALID_ARG, or
  *              VL_ERROR_ALREADY_HAS_DATA.
  */
-VLError   vl_set_creator_info(VLFile file, const VLCreatorInfo* info);
+VLError vl_set_creator_info(VLFile file, const VLCreatorInfo* info);
 
 /**
  * @brief Append a slice from caller-supplied float audio data.
@@ -465,9 +468,8 @@ VLError   vl_set_creator_info(VLFile file, const VLCreatorInfo* info);
  * @return       The assigned slice index (>= 0) on success, or a negative
  *               VLError code on failure.
  */
-int32_t   vl_add_slice(VLFile file, int32_t ppq_pos,
-                        const float* left, const float* right,
-                        int32_t frames);
+int32_t vl_add_slice(VLFile file, int32_t ppq_pos, const float* left, const float* right,
+                     int32_t frames);
 
 /**
  * @brief Remove a slice by index, shifting subsequent indices down.
@@ -479,7 +481,7 @@ int32_t   vl_add_slice(VLFile file, int32_t ppq_pos,
  * @param index  Zero-based slice index to remove.
  * @return       VL_OK, VL_ERROR_INVALID_HANDLE, or VL_ERROR_INVALID_SLICE.
  */
-VLError   vl_remove_slice(VLFile file, int32_t index);
+VLError vl_remove_slice(VLFile file, int32_t index);
 
 /**
  * @brief Encode and serialise the assembled file to disk.
@@ -492,7 +494,7 @@ VLError   vl_remove_slice(VLFile file, int32_t index);
  * @param path  Destination file path (created or overwritten).
  * @return      VL_OK on success, or a negative VLError on failure.
  */
-VLError   vl_save(VLFile file, const char* path);
+VLError vl_save(VLFile file, const char* path);
 
 /**
  * @brief Encode and serialise the assembled file to a caller-owned buffer.
@@ -514,7 +516,7 @@ VLError   vl_save(VLFile file, const char* path);
  *                  On exit: actual byte count written (or required).
  * @return          VL_OK on success, or a negative VLError on failure.
  */
-VLError   vl_save_to_memory(VLFile file, void* buf, size_t* size_out);
+VLError vl_save_to_memory(VLFile file, void* buf, size_t* size_out);
 
 /* -----------------------------------------------------------------------
    Utility

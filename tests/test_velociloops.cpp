@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include <doctest/doctest.h>
-
 #include "velociloops.h"
+
+#include <doctest/doctest.h>
 
 #include <algorithm>
 #include <cmath>
@@ -15,27 +15,35 @@
 #include <string>
 #include <vector>
 
-namespace {
+namespace
+{
 
 namespace fs = std::filesystem;
 
 const fs::path kDataDir = VELOCILOOPS_TEST_DATA_DIR;
 
-struct ScopedVLFile {
+struct ScopedVLFile
+{
     VLFile handle = nullptr;
 
     explicit ScopedVLFile(VLFile h = nullptr) : handle(h) {}
-    ~ScopedVLFile() { vl_close(handle); }
+    ~ScopedVLFile()
+    {
+        vl_close(handle);
+    }
 
     ScopedVLFile(const ScopedVLFile&) = delete;
     ScopedVLFile& operator=(const ScopedVLFile&) = delete;
 
-    ScopedVLFile(ScopedVLFile&& other) noexcept : handle(other.handle) {
+    ScopedVLFile(ScopedVLFile&& other) noexcept : handle(other.handle)
+    {
         other.handle = nullptr;
     }
 
-    ScopedVLFile& operator=(ScopedVLFile&& other) noexcept {
-        if (this != &other) {
+    ScopedVLFile& operator=(ScopedVLFile&& other) noexcept
+    {
+        if (this != &other)
+        {
             vl_close(handle);
             handle = other.handle;
             other.handle = nullptr;
@@ -43,37 +51,47 @@ struct ScopedVLFile {
         return *this;
     }
 
-    explicit operator bool() const { return handle != nullptr; }
+    explicit operator bool() const
+    {
+        return handle != nullptr;
+    }
 };
 
-struct DecodedSlice {
+struct DecodedSlice
+{
     VLSliceInfo info = {};
     std::vector<float> left;
     std::vector<float> right;
 };
 
-struct DecodedFile {
+struct DecodedFile
+{
     VLFileInfo info = {};
     std::vector<DecodedSlice> slices;
 };
 
-struct WavInfo {
+struct WavInfo
+{
     uint16_t channels = 0;
     uint32_t sampleRate = 0;
     uint16_t bitDepth = 0;
     uint32_t dataBytes = 0;
 };
 
-struct ChunkRange {
+struct ChunkRange
+{
     size_t payload = 0;
     uint32_t size = 0;
     bool found = false;
 };
 
-std::vector<fs::path> dataFiles() {
+std::vector<fs::path> dataFiles()
+{
     std::vector<fs::path> files;
-    for (const auto& entry : fs::directory_iterator(kDataDir)) {
-        if (entry.is_regular_file() && entry.path().extension() != ".png") {
+    for (const auto& entry : fs::directory_iterator(kDataDir))
+    {
+        if (entry.is_regular_file() && entry.path().extension() != ".png")
+        {
             files.push_back(entry.path());
         }
     }
@@ -81,27 +99,30 @@ std::vector<fs::path> dataFiles() {
     return files;
 }
 
-std::vector<uint8_t> readFile(const fs::path& path) {
+std::vector<uint8_t> readFile(const fs::path& path)
+{
     std::ifstream in(path, std::ios::binary);
     REQUIRE(in);
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
-uint16_t le16(const uint8_t* p) {
+uint16_t le16(const uint8_t* p)
+{
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
 }
 
-uint32_t le32(const uint8_t* p) {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+uint32_t le32(const uint8_t* p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
-uint32_t be32(const uint8_t* p) {
-    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
-           ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+uint32_t be32(const uint8_t* p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
 }
 
-void putBe32(std::vector<uint8_t>& bytes, size_t off, uint32_t value) {
+void putBe32(std::vector<uint8_t>& bytes, size_t off, uint32_t value)
+{
     REQUIRE(off + 4 <= bytes.size());
     bytes[off + 0] = (uint8_t)(value >> 24);
     bytes[off + 1] = (uint8_t)(value >> 16);
@@ -109,27 +130,29 @@ void putBe32(std::vector<uint8_t>& bytes, size_t off, uint32_t value) {
     bytes[off + 3] = (uint8_t)value;
 }
 
-ChunkRange findChunkInRange(
-    const std::vector<uint8_t>& bytes,
-    const char id[4],
-    size_t start,
-    size_t end) {
+ChunkRange findChunkInRange(const std::vector<uint8_t>& bytes, const char id[4], size_t start, size_t end)
+{
     size_t off = start;
-    while (off + 8 <= end && off + 8 <= bytes.size()) {
+    while (off + 8 <= end && off + 8 <= bytes.size())
+    {
         const size_t header = off;
         const uint32_t size = be32(bytes.data() + off + 4);
         off += 8;
-        if (off + size > bytes.size()) {
+        if (off + size > bytes.size())
+        {
             break;
         }
 
-        if (std::memcmp(bytes.data() + header, id, 4) == 0) {
+        if (std::memcmp(bytes.data() + header, id, 4) == 0)
+        {
             return {off, size, true};
         }
 
-        if (std::memcmp(bytes.data() + header, "CAT ", 4) == 0 && size >= 4) {
+        if (std::memcmp(bytes.data() + header, "CAT ", 4) == 0 && size >= 4)
+        {
             ChunkRange nested = findChunkInRange(bytes, id, off + 4, off + size);
-            if (nested.found) {
+            if (nested.found)
+            {
                 return nested;
             }
         }
@@ -140,32 +163,38 @@ ChunkRange findChunkInRange(
     return {};
 }
 
-ChunkRange findChunk(const std::vector<uint8_t>& bytes, const char id[4]) {
+ChunkRange findChunk(const std::vector<uint8_t>& bytes, const char id[4])
+{
     REQUIRE(bytes.size() >= 12);
     REQUIRE(std::memcmp(bytes.data(), "CAT ", 4) == 0);
     return findChunkInRange(bytes, id, 12, bytes.size());
 }
 
-bool readWavInfo(const fs::path& path, WavInfo& out) {
+bool readWavInfo(const fs::path& path, WavInfo& out)
+{
     const auto bytes = readFile(path);
-    if (bytes.size() < 12 || std::memcmp(bytes.data(), "RIFF", 4) != 0 ||
-        std::memcmp(bytes.data() + 8, "WAVE", 4) != 0) {
+    if (bytes.size() < 12 || std::memcmp(bytes.data(), "RIFF", 4) != 0 || std::memcmp(bytes.data() + 8, "WAVE", 4) != 0)
+    {
         return false;
     }
 
     bool sawFmt = false;
     bool sawData = false;
     size_t off = 12;
-    while (off + 8 <= bytes.size()) {
+    while (off + 8 <= bytes.size())
+    {
         const uint8_t* chunk = bytes.data() + off;
         const uint32_t size = le32(chunk + 4);
         off += 8;
-        if (off + size > bytes.size()) {
+        if (off + size > bytes.size())
+        {
             return false;
         }
 
-        if (std::memcmp(chunk, "fmt ", 4) == 0) {
-            if (size < 16) {
+        if (std::memcmp(chunk, "fmt ", 4) == 0)
+        {
+            if (size < 16)
+            {
                 return false;
             }
             const uint16_t format = le16(bytes.data() + off);
@@ -173,7 +202,9 @@ bool readWavInfo(const fs::path& path, WavInfo& out) {
             out.sampleRate = le32(bytes.data() + off + 4);
             out.bitDepth = le16(bytes.data() + off + 14);
             sawFmt = format == 1;
-        } else if (std::memcmp(chunk, "data", 4) == 0) {
+        }
+        else if (std::memcmp(chunk, "data", 4) == 0)
+        {
             out.dataBytes = size;
             sawData = true;
         }
@@ -184,40 +215,32 @@ bool readWavInfo(const fs::path& path, WavInfo& out) {
     return sawFmt && sawData;
 }
 
-std::set<std::string> expectedOpenableContainers() {
+std::set<std::string> expectedOpenableContainers()
+{
     return {
-        "100HasCreatorInfo.rx2",
-        "100WeirdSampleRate.rx2",
-        "120AllMuted.rx2",
-        "120FourBeats.rx2",
-        "120Gated.rx2",
-        "120GatedMuted.rx2",
-        "120Mono copy.rx2",
-        "120Mono24Bits.rx2",
-        "120Mono.rx2",
-        "120SevenEights.rx2",
-        "120Stereo copy.rx2",
-        "120Stereo.rx2",
-        "120ThreeBeats.rx2",
-        "120TransmitAsOneSlice.rx2",
-        "240FiveHundredSlices.rx2",
-        "450OneHundredBars.rx2",
+        "100HasCreatorInfo.rx2", "100WeirdSampleRate.rx2",    "120AllMuted.rx2",          "120FourBeats.rx2",
+        "120Gated.rx2",          "120GatedMuted.rx2",         "120Mono copy.rx2",         "120Mono24Bits.rx2",
+        "120Mono.rx2",           "120SevenEights.rx2",        "120Stereo copy.rx2",       "120Stereo.rx2",
+        "120ThreeBeats.rx2",     "120TransmitAsOneSlice.rx2", "240FiveHundredSlices.rx2", "450OneHundredBars.rx2",
     };
 }
 
-std::set<std::string> expectedRenderableContainers() {
+std::set<std::string> expectedRenderableContainers()
+{
     auto names = expectedOpenableContainers();
     names.erase("100HasCreatorInfo.rx2");
     names.erase("100WeirdSampleRate.rx2");
     return names;
 }
 
-bool isContainerExtension(const fs::path& path) {
+bool isContainerExtension(const fs::path& path)
+{
     const std::string ext = path.extension().string();
     return ext == ".rx2" || ext == ".rex" || ext == ".rcy";
 }
 
-void checkInfoSane(const VLFileInfo& info) {
+void checkInfoSane(const VLFileInfo& info)
+{
     CHECK((info.channels == 1 || info.channels == 2));
     CHECK(info.sample_rate >= 8000);
     CHECK(info.sample_rate <= 192000);
@@ -233,14 +256,18 @@ void checkInfoSane(const VLFileInfo& info) {
     CHECK(info.loop_end <= info.total_frames);
 }
 
-void checkDecodedBuffer(const std::vector<float>& buffer) {
+void checkDecodedBuffer(const std::vector<float>& buffer)
+{
     CHECK(!buffer.empty());
-    CHECK(std::all_of(buffer.begin(), buffer.end(), [](float sample) {
-        return std::isfinite(sample) && sample >= -16.0f && sample <= 16.0f;
-    }));
+    CHECK(std::all_of(buffer.begin(), buffer.end(),
+                      [](float sample)
+                      {
+                          return std::isfinite(sample) && sample >= -16.0f && sample <= 16.0f;
+                      }));
 }
 
-DecodedFile decodeWholeFile(VLFile file) {
+DecodedFile decodeWholeFile(VLFile file)
+{
     DecodedFile decoded;
     REQUIRE(vl_get_info(file, &decoded.info) == VL_OK);
     checkInfoSane(decoded.info);
@@ -251,7 +278,8 @@ DecodedFile decodeWholeFile(VLFile file) {
     int32_t previousPpq = -1;
     double absoluteEnergy = 0.0;
 
-    for (int32_t index = 0; index < decoded.info.slice_count; ++index) {
+    for (int32_t index = 0; index < decoded.info.slice_count; ++index)
+    {
         DecodedSlice slice;
         CAPTURE(index);
         REQUIRE(vl_get_slice_info(file, index, &slice.info) == VL_OK);
@@ -266,29 +294,25 @@ DecodedFile decodeWholeFile(VLFile file) {
         REQUIRE(frames > 0);
 
         slice.left.assign((size_t)frames, -99.0f);
-        if (decoded.info.channels == 2) {
+        if (decoded.info.channels == 2)
+        {
             slice.right.assign((size_t)frames, -99.0f);
         }
 
         int32_t written = 0;
-        REQUIRE(vl_decode_slice(
-            file,
-            index,
-            slice.left.data(),
-            slice.right.empty() ? nullptr : slice.right.data(),
-            frames,
-            &written) == VL_OK);
+        REQUIRE(vl_decode_slice(file, index, slice.left.data(), slice.right.empty() ? nullptr : slice.right.data(), frames, &written) == VL_OK);
         CHECK(written == frames);
         checkDecodedBuffer(slice.left);
-        if (!slice.right.empty()) {
+        if (!slice.right.empty())
+        {
             checkDecodedBuffer(slice.right);
         }
 
-        absoluteEnergy += std::accumulate(
-            slice.left.begin(),
-            slice.left.end(),
-            0.0,
-            [](double total, float sample) { return total + std::fabs(sample); });
+        absoluteEnergy += std::accumulate(slice.left.begin(), slice.left.end(), 0.0,
+                                          [](double total, float sample)
+                                          {
+                                              return total + std::fabs(sample);
+                                          });
 
         decoded.slices.push_back(std::move(slice));
     }
@@ -297,13 +321,10 @@ DecodedFile decodeWholeFile(VLFile file) {
     return decoded;
 }
 
-void roundtripByReencoding(const DecodedFile& decoded) {
+void roundtripByReencoding(const DecodedFile& decoded)
+{
     VLError err = VL_OK;
-    ScopedVLFile out(vl_create_new(
-        decoded.info.channels,
-        decoded.info.sample_rate,
-        decoded.info.tempo,
-        &err));
+    ScopedVLFile out(vl_create_new(decoded.info.channels, decoded.info.sample_rate, decoded.info.tempo, &err));
     REQUIRE(out);
     CHECK(err == VL_OK);
 
@@ -313,15 +334,12 @@ void roundtripByReencoding(const DecodedFile& decoded) {
     info.processing_gain = 1000;
     REQUIRE(vl_set_info(out.handle, &info) == VL_OK);
 
-    for (size_t i = 0; i < decoded.slices.size(); ++i) {
+    for (size_t i = 0; i < decoded.slices.size(); ++i)
+    {
         const DecodedSlice& slice = decoded.slices[i];
         CAPTURE(i);
-        const int32_t added = vl_add_slice(
-            out.handle,
-            slice.info.ppq_pos,
-            slice.left.data(),
-            slice.right.empty() ? nullptr : slice.right.data(),
-            (int32_t)slice.left.size());
+        const int32_t added =
+            vl_add_slice(out.handle, slice.info.ppq_pos, slice.left.data(), slice.right.empty() ? nullptr : slice.right.data(), (int32_t)slice.left.size());
         REQUIRE(added == (int32_t)i);
     }
 
@@ -350,7 +368,8 @@ void roundtripByReencoding(const DecodedFile& decoded) {
     CHECK(reopenedInfo.slice_count == decoded.info.slice_count);
     CHECK(reopenedInfo.total_frames > 0);
 
-    for (int32_t index = 0; index < reopenedInfo.slice_count; ++index) {
+    for (int32_t index = 0; index < reopenedInfo.slice_count; ++index)
+    {
         CAPTURE(index);
         const int32_t frames = vl_get_slice_frame_count(reopened.handle, index);
         REQUIRE(frames > 0);
@@ -358,25 +377,18 @@ void roundtripByReencoding(const DecodedFile& decoded) {
         std::vector<float> left((size_t)frames);
         std::vector<float> right(reopenedInfo.channels == 2 ? (size_t)frames : 0u);
         int32_t written = 0;
-        REQUIRE(vl_decode_slice(
-            reopened.handle,
-            index,
-            left.data(),
-            right.empty() ? nullptr : right.data(),
-            frames,
-            &written) == VL_OK);
+        REQUIRE(vl_decode_slice(reopened.handle, index, left.data(), right.empty() ? nullptr : right.data(), frames, &written) == VL_OK);
         CHECK(written == frames);
         checkDecodedBuffer(left);
-        if (!right.empty()) {
+        if (!right.empty())
+        {
             checkDecodedBuffer(right);
         }
     }
 }
 
-std::vector<uint8_t> buildSmallEncodedFile(
-    int32_t channels = 1,
-    bool withCreator = false,
-    VLFileInfo* savedInfo = nullptr) {
+std::vector<uint8_t> buildSmallEncodedFile(int32_t channels = 1, bool withCreator = false, VLFileInfo* savedInfo = nullptr)
+{
     VLError err = VL_OK;
     ScopedVLFile file(vl_create_new(channels, 44100, 120000, &err));
     REQUIRE(file);
@@ -389,7 +401,8 @@ std::vector<uint8_t> buildSmallEncodedFile(
     info.transient_stretch = 0;
     REQUIRE(vl_set_info(file.handle, &info) == VL_OK);
 
-    if (withCreator) {
+    if (withCreator)
+    {
         VLCreatorInfo creator = {};
         std::strcpy(creator.name, "metadata");
         std::strcpy(creator.email, "metadata@example.invalid");
@@ -398,19 +411,16 @@ std::vector<uint8_t> buildSmallEncodedFile(
 
     std::vector<float> left(32);
     std::vector<float> right(channels == 2 ? 32u : 0u);
-    for (size_t i = 0; i < left.size(); ++i) {
+    for (size_t i = 0; i < left.size(); ++i)
+    {
         left[i] = std::sin((float)i * 0.2f) * 0.25f;
-        if (!right.empty()) {
+        if (!right.empty())
+        {
             right[i] = std::cos((float)i * 0.13f) * 0.15f;
         }
     }
 
-    REQUIRE(vl_add_slice(
-        file.handle,
-        0,
-        left.data(),
-        right.empty() ? nullptr : right.data(),
-        (int32_t)left.size()) == 0);
+    REQUIRE(vl_add_slice(file.handle, 0, left.data(), right.empty() ? nullptr : right.data(), (int32_t)left.size()) == 0);
 
     size_t size = 0;
     REQUIRE(vl_save_to_memory(file.handle, nullptr, &size) == VL_OK);
@@ -418,7 +428,8 @@ std::vector<uint8_t> buildSmallEncodedFile(
     REQUIRE(vl_save_to_memory(file.handle, bytes.data(), &size) == VL_OK);
     bytes.resize(size);
 
-    if (savedInfo) {
+    if (savedInfo)
+    {
         REQUIRE(vl_get_info(file.handle, savedInfo) == VL_OK);
     }
 
@@ -427,7 +438,8 @@ std::vector<uint8_t> buildSmallEncodedFile(
 
 } // namespace
 
-TEST_CASE("utility functions expose stable strings") {
+TEST_CASE("utility functions expose stable strings")
+{
     CHECK(std::string(vl_version_string()).find("velociloops ") == 0);
     CHECK(std::string(vl_error_string(VL_OK)) == "OK");
     CHECK(std::string(vl_error_string(VL_ERROR_INVALID_HANDLE)) == "invalid handle");
@@ -444,7 +456,8 @@ TEST_CASE("utility functions expose stable strings") {
     CHECK(std::string(vl_error_string((VLError)-12345)) == "unknown error");
 }
 
-TEST_CASE("invalid API arguments return errors") {
+TEST_CASE("invalid API arguments return errors")
+{
     VLError err = VL_OK;
     CHECK(vl_open(nullptr, &err) == nullptr);
     CHECK(err == VL_ERROR_INVALID_ARG);
@@ -473,11 +486,12 @@ TEST_CASE("invalid API arguments return errors") {
     CHECK(vl_save_to_memory(nullptr, nullptr, nullptr) == VL_ERROR_INVALID_HANDLE);
 }
 
-TEST_CASE("malformed and patched containers cover parser edge cases") {
-    SUBCASE("SINF bit depth codes are reported") {
-        for (const auto& codeAndDepth : {std::pair<uint8_t, int32_t>{1, 8},
-                                         std::pair<uint8_t, int32_t>{7, 32},
-                                         std::pair<uint8_t, int32_t>{0xff, 16}}) {
+TEST_CASE("malformed and patched containers cover parser edge cases")
+{
+    SUBCASE("SINF bit depth codes are reported")
+    {
+        for (const auto& codeAndDepth : {std::pair<uint8_t, int32_t>{1, 8}, std::pair<uint8_t, int32_t>{7, 32}, std::pair<uint8_t, int32_t>{0xff, 16}})
+        {
             CAPTURE((int)codeAndDepth.first);
             std::vector<uint8_t> bytes = buildSmallEncodedFile();
             const ChunkRange sinf = findChunk(bytes, "SINF");
@@ -496,7 +510,8 @@ TEST_CASE("malformed and patched containers cover parser edge cases") {
         }
     }
 
-    SUBCASE("truncated CREI strings do not make an otherwise valid file unreadable") {
+    SUBCASE("truncated CREI strings do not make an otherwise valid file unreadable")
+    {
         std::vector<uint8_t> bytes = buildSmallEncodedFile(1, true);
         const ChunkRange crei = findChunk(bytes, "CREI");
         REQUIRE(crei.found);
@@ -512,7 +527,8 @@ TEST_CASE("malformed and patched containers cover parser edge cases") {
         CHECK(vl_get_creator_info(file.handle, &creator) == VL_ERROR_NO_CREATOR_INFO);
     }
 
-    SUBCASE("out of range SLCE sample starts decode as silence") {
+    SUBCASE("out of range SLCE sample starts decode as silence")
+    {
         VLFileInfo savedInfo = {};
         std::vector<uint8_t> bytes = buildSmallEncodedFile(1, false, &savedInfo);
         const ChunkRange slce = findChunk(bytes, "SLCE");
@@ -538,10 +554,13 @@ TEST_CASE("malformed and patched containers cover parser edge cases") {
     }
 }
 
-TEST_CASE("WAV fixtures are valid PCM references") {
+TEST_CASE("WAV fixtures are valid PCM references")
+{
     int wavCount = 0;
-    for (const fs::path& path : dataFiles()) {
-        if (path.extension() != ".wav") {
+    for (const fs::path& path : dataFiles())
+    {
+        if (path.extension() != ".wav")
+        {
             continue;
         }
         CAPTURE(path.filename().string());
@@ -557,7 +576,8 @@ TEST_CASE("WAV fixtures are valid PCM references") {
     CHECK(wavCount == 17);
 }
 
-TEST_CASE("mono slice rendering matches decoded DWOP trace after render offset") {
+TEST_CASE("mono slice rendering matches decoded DWOP trace after render offset")
+{
     VLError err = VL_OK;
     ScopedVLFile file(vl_open((kDataDir / "120Mono.rx2").string().c_str(), &err));
     REQUIRE(file);
@@ -577,13 +597,15 @@ TEST_CASE("mono slice rendering matches decoded DWOP trace after render offset")
     const int32_t expected[] = {-410, -209, 205, 564, 709, 585, 161, -349, -637, -561};
     const float gain = (float)info.processing_gain * 0.000833333354f;
     REQUIRE(gain > 0.0f);
-    for (size_t i = 0; i < std::size(expected); ++i) {
+    for (size_t i = 0; i < std::size(expected); ++i)
+    {
         CAPTURE(i);
         CHECK((int32_t)std::lround(left[i] * 32768.0f / gain) == expected[i]);
     }
 }
 
-TEST_CASE("stereo files synthesize the leading loop slice reported by the official SDK") {
+TEST_CASE("stereo files synthesize the leading loop slice reported by the official SDK")
+{
     VLError err = VL_OK;
     ScopedVLFile file(vl_open((kDataDir / "120Stereo.rx2").string().c_str(), &err));
     REQUIRE(file);
@@ -610,31 +632,37 @@ TEST_CASE("stereo files synthesize the leading loop slice reported by the offici
     CHECK(right[0] == doctest::Approx(-0.009613f).epsilon(0.001f));
 }
 
-TEST_CASE("all test data files are classified by the public opener") {
+TEST_CASE("all test data files are classified by the public opener")
+{
     const auto files = dataFiles();
     const auto expected = expectedOpenableContainers();
     CHECK(files.size() == 40);
 
     int decodableCount = 0;
     int rejectedCount = 0;
-    for (const fs::path& path : files) {
+    for (const fs::path& path : files)
+    {
         const std::string name = path.filename().string();
         CAPTURE(name);
 
         VLError err = VL_OK;
         ScopedVLFile file(vl_open(path.string().c_str(), &err));
         const bool shouldDecode = expected.count(name) != 0;
-        if (shouldDecode) {
+        if (shouldDecode)
+        {
             REQUIRE(file);
             CHECK(err == VL_OK);
             ++decodableCount;
-        } else {
+        }
+        else
+        {
             REQUIRE_FALSE(file);
             CHECK((err == VL_ERROR_FILE_CORRUPT || err == VL_ERROR_INVALID_ARG));
             ++rejectedCount;
         }
 
-        if (isContainerExtension(path)) {
+        if (isContainerExtension(path))
+        {
             const auto bytes = readFile(path);
             VLError memErr = VL_OK;
             ScopedVLFile fromMemory(vl_open_from_memory(bytes.data(), bytes.size(), &memErr));
@@ -647,8 +675,10 @@ TEST_CASE("all test data files are classified by the public opener") {
     CHECK(rejectedCount == (int)(files.size() - expected.size()));
 }
 
-TEST_CASE("every decodable fixture renders every slice and roundtrips through memory") {
-    for (const std::string& name : expectedOpenableContainers()) {
+TEST_CASE("every decodable fixture renders every slice and roundtrips through memory")
+{
+    for (const std::string& name : expectedOpenableContainers())
+    {
         CAPTURE(name);
         const fs::path path = kDataDir / name;
 
@@ -676,34 +706,38 @@ TEST_CASE("every decodable fixture renders every slice and roundtrips through me
 
         VLCreatorInfo creator = {};
         const VLError creatorResult = vl_get_creator_info(file.handle, &creator);
-        if (creatorResult == VL_OK) {
-            CHECK((creator.name[0] || creator.copyright[0] || creator.url[0] ||
-                   creator.email[0] || creator.free_text[0]));
-        } else {
+        if (creatorResult == VL_OK)
+        {
+            CHECK((creator.name[0] || creator.copyright[0] || creator.url[0] || creator.email[0] || creator.free_text[0]));
+        }
+        else
+        {
             CHECK(creatorResult == VL_ERROR_NO_CREATOR_INFO);
         }
 
         const int32_t firstFrames = vl_get_slice_frame_count(file.handle, 0);
-        if (expectedRenderableContainers().count(name) != 0) {
+        if (expectedRenderableContainers().count(name) != 0)
+        {
             REQUIRE(firstFrames > 0);
             std::vector<float> tooSmall((size_t)firstFrames);
-            CHECK(vl_decode_slice(file.handle, 0, nullptr, nullptr, firstFrames, nullptr) ==
-                  VL_ERROR_INVALID_ARG);
-            CHECK(vl_decode_slice(file.handle, 0, tooSmall.data(), nullptr, firstFrames - 1, nullptr) ==
-                  VL_ERROR_BUFFER_TOO_SMALL);
-            CHECK(vl_decode_slice(file.handle, -1, tooSmall.data(), nullptr, firstFrames, nullptr) ==
-                  VL_ERROR_INVALID_SLICE);
-            CHECK(vl_decode_slice(file.handle, info.slice_count, tooSmall.data(), nullptr, firstFrames, nullptr) ==
-                  VL_ERROR_INVALID_SLICE);
-        } else {
+            CHECK(vl_decode_slice(file.handle, 0, nullptr, nullptr, firstFrames, nullptr) == VL_ERROR_INVALID_ARG);
+            CHECK(vl_decode_slice(file.handle, 0, tooSmall.data(), nullptr, firstFrames - 1, nullptr) == VL_ERROR_BUFFER_TOO_SMALL);
+            CHECK(vl_decode_slice(file.handle, -1, tooSmall.data(), nullptr, firstFrames, nullptr) == VL_ERROR_INVALID_SLICE);
+            CHECK(vl_decode_slice(file.handle, info.slice_count, tooSmall.data(), nullptr, firstFrames, nullptr) == VL_ERROR_INVALID_SLICE);
+        }
+        else
+        {
             CHECK(info.slice_count == 0);
             CHECK(firstFrames == VL_ERROR_INVALID_SLICE);
         }
 
         DecodedFile decoded;
-        if (expectedRenderableContainers().count(name) != 0) {
+        if (expectedRenderableContainers().count(name) != 0)
+        {
             decoded = decodeWholeFile(file.handle);
-        } else {
+        }
+        else
+        {
             checkInfoSane(info);
         }
 
@@ -713,8 +747,7 @@ TEST_CASE("every decodable fixture renders every slice and roundtrips through me
 
         std::vector<uint8_t> shortOriginal(originalSize > 0 ? originalSize - 1 : 0);
         size_t shortOriginalSize = shortOriginal.size();
-        CHECK(vl_save_to_memory(file.handle, shortOriginal.data(), &shortOriginalSize) ==
-              VL_ERROR_BUFFER_TOO_SMALL);
+        CHECK(vl_save_to_memory(file.handle, shortOriginal.data(), &shortOriginalSize) == VL_ERROR_BUFFER_TOO_SMALL);
         CHECK(shortOriginalSize == originalSize);
 
         std::vector<uint8_t> originalCopy(originalSize);
@@ -723,19 +756,22 @@ TEST_CASE("every decodable fixture renders every slice and roundtrips through me
         CHECK(originalCopy == readFile(path));
         CHECK(vl_save_to_memory(file.handle, originalCopy.data(), nullptr) == VL_ERROR_INVALID_ARG);
 
-        if (expectedRenderableContainers().count(name) != 0) {
+        if (expectedRenderableContainers().count(name) != 0)
+        {
             roundtripByReencoding(decoded);
         }
     }
 }
 
-TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reopened") {
+TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reopened")
+{
     CHECK(vl_create_new(0, 44100, 120000, nullptr) == nullptr);
     CHECK(vl_create_new(1, 7999, 120000, nullptr) == nullptr);
     CHECK(vl_create_new(1, 192001, 120000, nullptr) == nullptr);
     CHECK(vl_create_new(1, 44100, 0, nullptr) == nullptr);
 
-    SUBCASE("empty files and invalid metadata fail before encoding") {
+    SUBCASE("empty files and invalid metadata fail before encoding")
+    {
         VLError err = VL_OK;
         ScopedVLFile file(vl_create_new(1, 44100, 120000, &err));
         REQUIRE(file);
@@ -757,8 +793,10 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
         CHECK(vl_set_creator_info(file.handle, &creator) == VL_OK);
     }
 
-    SUBCASE("metadata normalization repairs unset timing and invalid loop bounds") {
-        for (const bool invalidLoopStart : {false, true}) {
+    SUBCASE("metadata normalization repairs unset timing and invalid loop bounds")
+    {
+        for (const bool invalidLoopStart : {false, true})
+        {
             CAPTURE(invalidLoopStart);
             VLError err = VL_OK;
             ScopedVLFile file(vl_create_new(1, 44100, 120000, &err));
@@ -775,17 +813,21 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
             info.transient_decay = 0;
             info.transient_stretch = 250;
             info.silence_selected = 1;
-            if (invalidLoopStart) {
+            if (invalidLoopStart)
+            {
                 info.loop_start = 1000;
                 info.loop_end = 0;
-            } else {
+            }
+            else
+            {
                 info.loop_start = 0;
                 info.loop_end = 2000;
             }
             REQUIRE(vl_set_info(file.handle, &info) == VL_OK);
 
             std::vector<float> samples(64);
-            for (size_t i = 0; i < samples.size(); ++i) {
+            for (size_t i = 0; i < samples.size(); ++i)
+            {
                 samples[i] = (i % 2 == 0) ? 1.25f : -1.25f;
             }
             REQUIRE(vl_add_slice(file.handle, 0, samples.data(), nullptr, (int32_t)samples.size()) == 0);
@@ -812,7 +854,8 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
         }
     }
 
-    SUBCASE("mono file with creator metadata") {
+    SUBCASE("mono file with creator metadata")
+    {
         VLError err = VL_OK;
         ScopedVLFile file(vl_create_new(1, 44100, 120000, &err));
         REQUIRE(file);
@@ -835,17 +878,17 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
 
         std::vector<float> first(128);
         std::vector<float> second(96);
-        for (size_t i = 0; i < first.size(); ++i) {
+        for (size_t i = 0; i < first.size(); ++i)
+        {
             first[i] = (float)i / (float)first.size() * 0.5f - 0.25f;
         }
-        for (size_t i = 0; i < second.size(); ++i) {
+        for (size_t i = 0; i < second.size(); ++i)
+        {
             second[i] = std::sin((float)i * 0.1f) * 0.35f;
         }
 
-        CHECK(vl_add_slice(file.handle, -1, first.data(), nullptr, (int32_t)first.size()) ==
-              VL_ERROR_INVALID_ARG);
-        CHECK(vl_add_slice(file.handle, 0, nullptr, nullptr, (int32_t)first.size()) ==
-              VL_ERROR_INVALID_ARG);
+        CHECK(vl_add_slice(file.handle, -1, first.data(), nullptr, (int32_t)first.size()) == VL_ERROR_INVALID_ARG);
+        CHECK(vl_add_slice(file.handle, 0, nullptr, nullptr, (int32_t)first.size()) == VL_ERROR_INVALID_ARG);
         CHECK(vl_add_slice(file.handle, 0, first.data(), nullptr, 0) == VL_ERROR_INVALID_ARG);
         REQUIRE(vl_add_slice(file.handle, 0, first.data(), nullptr, (int32_t)first.size()) == 0);
         REQUIRE(vl_add_slice(file.handle, 15360, second.data(), nullptr, (int32_t)second.size()) == 1);
@@ -869,8 +912,7 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
         fs::remove(savedPath);
         REQUIRE(vl_save(file.handle, savedPath.string().c_str()) == VL_OK);
         CHECK(fs::exists(savedPath));
-        CHECK(vl_save(file.handle, fs::temp_directory_path().string().c_str()) ==
-              VL_ERROR_INVALID_ARG);
+        CHECK(vl_save(file.handle, fs::temp_directory_path().string().c_str()) == VL_ERROR_INVALID_ARG);
         fs::remove(savedPath);
 
         ScopedVLFile reopened(vl_open_from_memory(bytes.data(), bytes.size(), &err));
@@ -890,7 +932,8 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
         CHECK(decoded.slices.size() == 2);
     }
 
-    SUBCASE("stereo file keeps independent channels") {
+    SUBCASE("stereo file keeps independent channels")
+    {
         VLError err = VL_OK;
         ScopedVLFile file(vl_create_new(2, 48000, 90000, &err));
         REQUIRE(file);
@@ -905,13 +948,13 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
 
         std::vector<float> left(160);
         std::vector<float> right(160);
-        for (size_t i = 0; i < left.size(); ++i) {
+        for (size_t i = 0; i < left.size(); ++i)
+        {
             left[i] = std::sin((float)i * 0.07f) * 0.4f;
             right[i] = std::cos((float)i * 0.11f) * 0.2f;
         }
 
-        CHECK(vl_add_slice(file.handle, 0, left.data(), nullptr, (int32_t)left.size()) ==
-              VL_ERROR_INVALID_ARG);
+        CHECK(vl_add_slice(file.handle, 0, left.data(), nullptr, (int32_t)left.size()) == VL_ERROR_INVALID_ARG);
         REQUIRE(vl_add_slice(file.handle, 0, left.data(), right.data(), (int32_t)left.size()) == 0);
 
         size_t size = 0;
@@ -932,22 +975,14 @@ TEST_CASE("fresh mono and stereo files can be assembled, mutated, saved, and reo
         std::vector<float> decodedLeft((size_t)frames);
         std::vector<float> decodedRight((size_t)frames);
         int32_t written = 0;
-        REQUIRE(vl_decode_slice(
-            reopened.handle,
-            0,
-            decodedLeft.data(),
-            decodedRight.data(),
-            frames,
-            &written) == VL_OK);
+        REQUIRE(vl_decode_slice(reopened.handle, 0, decodedLeft.data(), decodedRight.data(), frames, &written) == VL_OK);
         CHECK(written == frames);
         checkDecodedBuffer(decodedLeft);
         checkDecodedBuffer(decodedRight);
-        CHECK(std::inner_product(
-                  decodedLeft.begin(),
-                  decodedLeft.end(),
-                  decodedRight.begin(),
-                  0.0,
-                  std::plus<double>(),
-                  [](float l, float r) { return std::fabs(l - r); }) > 0.01);
+        CHECK(std::inner_product(decodedLeft.begin(), decodedLeft.end(), decodedRight.begin(), 0.0, std::plus<double>(),
+                                 [](float l, float r)
+                                 {
+                                     return std::fabs(l - r);
+                                 }) > 0.01);
     }
 }

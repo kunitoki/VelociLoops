@@ -35,6 +35,21 @@ if (PROJECT_IS_TOP_LEVEL)
             target_link_options(velociloops_static INTERFACE --coverage)
         endif()
 
+        cmake_dependent_option(VELOCILOOPS_SANITIZERS
+            "Enable AddressSanitizer + UBSan (requires Clang or GCC)" OFF
+            "VELOCILOOPS_ENABLE_TESTING" OFF)
+
+        if (VELOCILOOPS_SANITIZERS)
+            target_compile_options(velociloops_static PRIVATE
+                -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+            target_link_options(velociloops_static INTERFACE
+                -fsanitize=address,undefined)
+        endif()
+
+        cmake_dependent_option(VELOCILOOPS_ENABLE_FUZZING
+            "Build libFuzzer target (requires Clang with -fsanitize=fuzzer)" OFF
+            "VELOCILOOPS_ENABLE_TESTING" OFF)
+
         add_subdirectory(tests)
     endif()
 

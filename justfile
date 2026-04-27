@@ -31,6 +31,20 @@ coverage:
     genhtml build-coverage/coverage.info --ignore-errors category,inconsistent,unsupported -o build-coverage/coverage_html
     open build-coverage/coverage_html/index.html
 
+sanitize:
+    cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DVELOCILOOPS_SANITIZERS=ON
+    cmake --build build-sanitize --parallel $(nproc)
+    ctest --test-dir build-sanitize --output-on-failure
+
+fuzz:
+    cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+        -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+        -DVELOCILOOPS_ENABLE_FUZZING=ON
+    cmake --build build-fuzz --parallel $(nproc) --target velociloops_fuzzer
+    ./build-fuzz/tests/velociloops_fuzzer \
+        tests/fuzz/ -max_total_time=30 -max_len=980128 -rss_limit_mb=512 tests/data/
+
 visualize: generate
     uv venv --allow-existing
     uv pip install --requirement scripts/requirements.txt

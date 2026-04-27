@@ -44,7 +44,7 @@
 .venv/
 _build/
 build*/
-Parking/
+parking/
 AGENTS.md
 CLAUDE.md
 .DS_Store
