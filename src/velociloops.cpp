@@ -1,6 +1,7 @@
 #include "velociloops.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -2164,8 +2165,10 @@ static int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_
         return (int32_t)VL_ERROR_OUT_OF_MEMORY; // LCOV_EXCL_LINE max_size is not reachable in tests.
 
     if (file->impl.pcm.size() < required)
+    {
         if (!file->impl.pcm.resize(required, 0))
             return (int32_t)VL_ERROR_OUT_OF_MEMORY;
+    }
 
     for (int32_t f = 0; f < frames; ++f)
     {

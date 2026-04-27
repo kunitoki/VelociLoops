@@ -7,15 +7,16 @@ prepare:
 generate: prepare
     cmake -G Xcode -B build .
 
+build: generate
+    cmake --build build --parallel $(nproc) -- -quiet
+
 open: generate
     -open build/VelociLoops.xcodeproj
 
-run: generate
-    cmake -G Xcode -B build .
-    cmake --build build --parallel $(nproc) --target velociloops -- -quiet
-    cmake --build build --parallel $(nproc) --target velociloops_static -- -quiet
-    cmake --build build --parallel $(nproc) --target velociloops_shared -- -quiet
+test: build
     ctest --test-dir build -C Debug --output-on-failure
+
+run: build
     ./build/demo/Debug/velociloops tests/data/120Stereo.rx2
 
 coverage:
