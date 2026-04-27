@@ -113,8 +113,8 @@ implemented.
 
 ReCycle output vs VelociLoops output for `120Stereo.rx2`:
 
-![ReCycle](sound_recycle.jpg)
-![VelociLoops](sound_velociloops.jpg)
+![ReCycle](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/sound_recycle.jpg?x=2)
+![VelociLoops](https://raw.githubusercontent.com/kunitoki/VelociLoops/main/sound_velociloops.jpg?x=2)
 
 ---
 
