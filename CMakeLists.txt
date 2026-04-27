@@ -19,7 +19,6 @@ if (PROJECT_IS_TOP_LEVEL)
 
         if (VELOCILOOPS_COVERAGE)
             target_compile_options(velociloops_library PRIVATE --coverage)
-            target_link_options(velociloops_library PRIVATE --coverage)
         endif()
 
         add_subdirectory(tests)
