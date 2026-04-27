@@ -48,6 +48,15 @@ jobs:
             --include "$GITHUB_WORKSPACE/src/*" \
             -o build/coverage.info
 
+      - name: Generate HTML Report
+        run: genhtml build/coverage.info --branch-coverage -o build/coverage_html
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage_html
+
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
