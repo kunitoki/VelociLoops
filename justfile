@@ -12,7 +12,9 @@ open: generate
 
 run: generate
     cmake -G Xcode -B build .
-    cmake --build build --parallel $(nproc) -- -quiet
+    cmake --build build --parallel $(nproc) --target velociloops -- -quiet
+    cmake --build build --parallel $(nproc) --target velociloops_static -- -quiet
+    cmake --build build --parallel $(nproc) --target velociloops_shared -- -quiet
     ctest --test-dir build -C Debug --output-on-failure
     ./build/demo/Debug/velociloops tests/data/120Stereo.rx2
 
@@ -28,6 +30,11 @@ coverage:
     lcov --summary build-coverage/coverage.info --ignore-errors inconsistent,unsupported --fail-under-lines 100
     genhtml build-coverage/coverage.info --ignore-errors category,inconsistent,unsupported -o build-coverage/coverage_html
     open build-coverage/coverage_html/index.html
+
+visualize: generate
+    uv venv --allow-existing
+    uv pip install --requirement scripts/requirements.txt
+    uv run scripts/visualize_rx2.py
 
 bump:
     perl -0pi -e 's/x=(\d+)/"x=" . ($1 + 1)/ge' README.md

@@ -109,6 +109,15 @@ implemented.
 
 ---
 
+## Waveform Comparison
+
+ReCycle output vs VelociLoops output for `120Stereo.rx2`:
+
+![ReCycle](sound_recycle.jpg)
+![VelociLoops](sound_velociloops.jpg)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE).

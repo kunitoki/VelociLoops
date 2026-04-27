@@ -41,6 +41,7 @@
 *.dwo
 
 # Folders
+.venv/
 _build/
 build*/
 Parking/
