@@ -19,3 +19,8 @@ target_compile_definitions(velociloops_tests
 )
 
 add_test(NAME velociloops_tests COMMAND velociloops_tests)
+
+if (VELOCILOOPS_COVERAGE)
+    target_compile_options(velociloops_tests PRIVATE --coverage)
+    target_link_options(velociloops_tests PRIVATE --coverage)
+endif()
