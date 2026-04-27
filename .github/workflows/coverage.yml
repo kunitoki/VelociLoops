@@ -44,7 +44,7 @@ jobs:
         run: |
           lcov -c -d build \
             --ignore-errors mismatch,unused \
-            --include "$GITHUB_WORKSPACE/src/*" \
+            --include "*/src/*" \
             -o build/coverage.info
           lcov --summary build/coverage.info \
             --ignore-errors inconsistent,unsupported \
