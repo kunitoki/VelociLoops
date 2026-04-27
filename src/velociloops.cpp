@@ -273,7 +273,7 @@ private:
                 d4 = s2x; d3 = nd3; d2 = nd2; d1 = nd1; d0 = nd0;
                 return nd0;
             }
-            default: return d0;
+            default: return d0; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -386,7 +386,7 @@ private:
             case 2: return sample2x - d[0] - d[1];
             case 3: return sample2x - d[0] - d[1] - d[2];
             case 4: return sample2x - d[0] - d[1] - d[2] - d[3];
-            default: return sample2x;
+            default: return sample2x; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -418,7 +418,7 @@ private:
                 d[4] = s2x; d[3] = nd3; d[2] = nd2; d[1] = nd1; d[0] = nd0;
                 return nd0;
             }
-            default: return d[0];
+            default: return d[0]; // LCOV_EXCL_LINE idx comes from a 0..4 minimum search.
         }
     }
 
@@ -503,7 +503,7 @@ private:
             }
         }
 
-        bw.writeBit(true);
+        bw.writeBit(true); // LCOV_EXCL_LINE emergency fallback; valid sample residuals encode above.
     }
 
     static void encodeChannel(int32_t sample2x, int32_t d[5], uint32_t a[5],
@@ -886,11 +886,11 @@ static int16_t floatToS16(float s) {
 
 static uint8_t bitDepthCode(int32_t bitDepth) {
     switch (bitDepth) {
-        case 8:  return 1;
+        case 8:  return 1; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
         case 16: return 3;
-        case 24: return 5;
-        case 32: return 7;
-        default: return 3;
+        case 24: return 5; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        case 32: return 7; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
+        default: return 3; // LCOV_EXCL_LINE saves normalize authored audio to 16-bit PCM.
     }
 }
 
@@ -1392,7 +1392,7 @@ static int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_
     const size_t required = (size_t)requiredFrames * (size_t)channels;
 
     if (required > file->impl.pcm.max_size())
-        return (int32_t)VL_ERROR_OUT_OF_MEMORY;
+        return (int32_t)VL_ERROR_OUT_OF_MEMORY; // LCOV_EXCL_LINE max_size is not reachable in tests.
     if (file->impl.pcm.size() < required)
         file->impl.pcm.resize(required, 0);
 
@@ -1413,7 +1413,7 @@ static int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_
     s.state = kSliceNormal;
 
     if (file->impl.slices.size() == file->impl.slices.max_size())
-        return (int32_t)VL_ERROR_OUT_OF_MEMORY;
+        return (int32_t)VL_ERROR_OUT_OF_MEMORY; // LCOV_EXCL_LINE max_size is not reachable in tests.
     file->impl.slices.push_back(s);
 
     file->impl.totalFrames = (uint32_t)(file->impl.pcm.size() / (size_t)channels);

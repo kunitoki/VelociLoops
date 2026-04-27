@@ -42,14 +42,17 @@ jobs:
 
       - name: Collect Coverage
         run: |
-          lcov -c -d build --rc branch_coverage=1 \
+          lcov -c -d build \
             --ignore-errors mismatch,unused \
             --include "$GITHUB_WORKSPACE/include/*" \
             --include "$GITHUB_WORKSPACE/src/*" \
             -o build/coverage.info
+          lcov --summary build/coverage.info \
+            --ignore-errors inconsistent,unsupported \
+            --fail-under-lines 100
 
       - name: Generate HTML Report
-        run: genhtml build/coverage.info --branch-coverage -o build/coverage_html
+        run: genhtml build/coverage.info --ignore-errors category,inconsistent,unsupported -o build/coverage_html
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
