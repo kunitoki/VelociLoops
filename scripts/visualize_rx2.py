@@ -212,7 +212,7 @@ def plot(time_axis, left, right, slice_times, loop_dur, bpm, sr, channels, title
     height_ratios = [0.075] + [1.0] * n_ch
     fig, all_axes = plt.subplots(
         n_ch + 1, 1,
-        figsize=(14, fig_h),
+        figsize=(13.4, fig_h),
         gridspec_kw={"hspace": 0.0, "height_ratios": height_ratios},
     )
     fig.patch.set_facecolor("#f2f2f8")
