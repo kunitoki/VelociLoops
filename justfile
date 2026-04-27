@@ -14,8 +14,8 @@ coverage:
     ctest --test-dir build-coverage --output-on-failure
     lcov -c -d build-coverage --rc branch_coverage=1 \
         --ignore-errors mismatch,unused \
-        --include "*/include/*" --include "*/src/*" \
-        --exclude "*/_deps/*" \
+        --include "$(pwd)/include/*" \
+        --include "$(pwd)/src/*" \
         -o build-coverage/coverage.info
     genhtml build-coverage/coverage.info --branch-coverage -o build-coverage/coverage_html
     open build-coverage/coverage_html/index.html
