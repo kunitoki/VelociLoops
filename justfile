@@ -21,5 +21,8 @@ coverage:
     genhtml build-coverage/coverage.info --ignore-errors category,inconsistent,unsupported -o build-coverage/coverage_html
     open build-coverage/coverage_html/index.html
 
+bump:
+    perl -0pi -e 's/x=(\d+)/"x=" . ($1 + 1)/ge' README.md
+
 clean:
     rm -rf build/*
