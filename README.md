@@ -33,7 +33,7 @@ cmake -B build .
 cmake --build build
 ```
 
-This produces the static library `libvelociloops_library.a` and the `velociloops` demo
+This produces the static library `libvelociloops_static`, shared library `libvelociloops_shared` and the `velociloops` demo
 executable.
 
 ### Run the demo
@@ -48,7 +48,7 @@ Extracts every slice as a WAV file and performs a save/reload round-trip check.
 
 ```cmake
 add_subdirectory(VelociLoops)
-target_link_libraries(my_target PRIVATE velociloops_library)
+target_link_libraries(my_target PRIVATE velociloops_static)
 ```
 
 ---

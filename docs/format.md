@@ -84,8 +84,9 @@ The official SDK parses this as:
 | later | 16 | UUID. Official SDK rejects non-zero UUID bytes. |
 | end | variable | Obsolete filename string. VelociLoops writes an empty string. |
 
-VelociLoops currently treats `HEAD` as a known chunk but does not need any field
-from it after the root `CAT REX2` structure has been accepted.
+VelociLoops validates the magic and accepts the fixture-compatible `bc 01`,
+`bc 02`, and `bc 03` format version records. Newer unsupported header versions
+are rejected as corrupt.
 
 ### `CREI` - Creator Info
 
@@ -333,9 +334,12 @@ transient-stretch tail.
 decoded PCM buffer. `vl_decode_slice()` renders from that segment with these
 implementation details:
 
-- The sample read position starts two frames after the stored `SLCE` start. This
-  matches the observed `REXRenderSlice` behavior while keeping metadata tied to
-  the unshifted slice start.
+- If the first stored `SLCE` starts after a valid `SINF.loop_start`, VelociLoops
+  synthesizes a leading slice whose metadata spans `loop_start` to that first
+  stored slice. This matches the official SDK's reported slice list for files
+  such as `120Stereo.rx2`.
+- The sample read position starts two frames after the stored `SLCE` start,
+  matching observed `REXRenderSlice` behavior.
 - Samples are converted to float by dividing signed 16-bit PCM by `32768.0`.
 - `GLOB.processing_gain` is applied as described above.
 - If transient stretch is enabled, the rendered length can exceed
@@ -414,8 +418,6 @@ For each coded channel sample:
    if zeros_window == 0:
        step <<= 2
        zeros_window = 7
-   else:
-       step = base_step
    ```
 
 4. Adjust `j` and `rbits` to the final `step`:

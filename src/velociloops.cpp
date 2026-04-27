@@ -82,8 +82,6 @@ public:
                 if (--zerosWin == 0) {
                     step <<= 2;
                     zerosWin = 7;
-                } else {
-                    step = ((minAvg * 3u) + 36u) >> 7;
                 }
             }
             if (eof) break;
@@ -156,8 +154,6 @@ public:
                     if (--zerosWin == 0) {
                         step <<= 2;
                         zerosWin = 7;
-                    } else {
-                        step = ((minAvg * 3u) + 36u) >> 7;
                     }
                 }
                 if (eof) break;
@@ -498,8 +494,6 @@ private:
             if (--zerosWin == 0) {
                 step <<= 2;
                 zerosWin = 7;
-            } else {
-                step = baseStep;
             }
         }
 
@@ -572,6 +566,7 @@ struct VLSliceEntry {
     uint16_t     points         = 0x7fff;
     uint8_t      selected_flag  = 0;
     VLSliceState state          = kSliceNormal;
+    bool         synthetic_leading = false;
 };
 
 class VLFileImpl {
@@ -590,6 +585,7 @@ public:
     uint16_t                transientStretch    = 0x28;
     uint16_t                processingGain      = 1000;
     bool                    silenceSelected     = false;
+    bool                    headerValid         = true;
 
     static constexpr int32_t kREXPPQ = 15360;
 
@@ -614,6 +610,7 @@ public:
         info.transient_decay = transientDecay;
         info.transient_stretch = transientStretch;
         info.silence_selected = silenceSelected ? 1 : 0;
+        headerValid = true;
         std::memset(&creator, 0, sizeof(creator));
 
         if (fileData.size() < 12) return false;
@@ -626,6 +623,7 @@ public:
         parseIFF(8 + 4, fileData.size(), dwopOffset, dwopSize, hasDWOP);
         finalizeSlices();
 
+        if (!headerValid) return false;
         if (!hasDWOP || dwopSize == 0) return false;
         if (dwopOffset + dwopSize > fileData.size()) return false;
         if (totalFrames == 0) return false;
@@ -669,7 +667,8 @@ private:
             off += 4;
             if (off + sz > fileData.size()) break;
 
-            if      (std::strcmp(id, "CREI") == 0) parseCREI(&fileData[off], sz);
+            if      (std::strcmp(id, "HEAD") == 0) parseHEAD(&fileData[off], sz);
+            else if (std::strcmp(id, "CREI") == 0) parseCREI(&fileData[off], sz);
             else if (std::strcmp(id, "SINF") == 0) parseSINF(&fileData[off], sz);
             else if (std::strcmp(id, "GLOB") == 0) parseGLOB(&fileData[off], sz);
             else if (std::strcmp(id, "TRSH") == 0) parseTRSH(&fileData[off], sz);
@@ -716,6 +715,17 @@ private:
             if (t > 0) info.original_tempo = t;
         }
         if (info.original_tempo == 0) info.original_tempo = info.tempo;
+    }
+
+    void parseHEAD(const uint8_t* d, uint32_t sz) {
+        if (sz < 6 || be32(d) != 0x490cf18du) {
+            headerValid = false;
+            return;
+        }
+
+        if (d[4] != 0xbc || d[5] > 0x03) {
+            headerValid = false;
+        }
     }
 
     void parseGLOB(const uint8_t* d, uint32_t sz) {
@@ -805,6 +815,20 @@ private:
             const uint32_t rel = (s.sample_start > loopStart) ? (s.sample_start - loopStart) : 0;
             s.ppq_pos = (uint32_t)(((uint64_t)rel * info.ppq_length + denom / 2) / denom);
             out.push_back(s);
+        }
+
+        if (!out.empty() && loopStart > 0 && loopEnd > loopStart
+            && out.front().sample_start > loopStart
+            && out.front().sample_start <= totalFrames) {
+            VLSliceEntry leading;
+            leading.ppq_pos = 0;
+            leading.sample_start = loopStart;
+            leading.sample_length = out.front().sample_start - loopStart;
+            leading.points = 0x7fff;
+            leading.selected_flag = 1;
+            leading.state = kSliceNormal;
+            leading.synthetic_leading = true;
+            out.insert(out.begin(), leading);
         }
 
         slices.swap(out);
@@ -1276,8 +1300,6 @@ VLError vl_decode_slice(VLFile file, int32_t index,
     const int32_t ch = std::max(1, file->impl.info.channels);
     const float samplerGain = (float)file->impl.processingGain * 0.000833333354f;
 
-    // REXRenderSlice starts sample reads two frames after the stored SLCE start
-    // while keeping PPQ and rendered length tied to the unshifted slice position.
     uint32_t samplePos = std::min(sourceStart + 2u, sourceEnd);
     int loopPhase = 0; // 0: forward source, 1: forward loop, 2: backward loop
     bool stretchPhase = false;

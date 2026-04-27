@@ -42,8 +42,7 @@
 
 # Folders
 _build/
-build/
-build-coverage/
+build*/
 Parking/
 AGENTS.md
 CLAUDE.md

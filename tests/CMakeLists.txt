@@ -11,7 +11,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(doctest)
 
 add_executable(velociloops_tests test_velociloops.cpp)
-target_link_libraries(velociloops_tests PRIVATE velociloops_library doctest::doctest)
+target_link_libraries(velociloops_tests PRIVATE velociloops_static doctest::doctest)
 target_compile_features(velociloops_tests PRIVATE cxx_std_17)
 target_compile_definitions(velociloops_tests
     PRIVATE

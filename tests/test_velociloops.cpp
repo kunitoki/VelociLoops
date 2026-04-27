@@ -73,7 +73,7 @@ struct ChunkRange {
 std::vector<fs::path> dataFiles() {
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(kDataDir)) {
-        if (entry.is_regular_file()) {
+        if (entry.is_regular_file() && entry.path().extension() != ".png") {
             files.push_back(entry.path());
         }
     }
@@ -193,12 +193,14 @@ std::set<std::string> expectedOpenableContainers() {
         "120Gated.rx2",
         "120GatedMuted.rx2",
         "120Mono copy.rx2",
+        "120Mono24Bits.rx2",
         "120Mono.rx2",
         "120SevenEights.rx2",
         "120Stereo copy.rx2",
         "120Stereo.rx2",
         "120ThreeBeats.rx2",
         "120TransmitAsOneSlice.rx2",
+        "240FiveHundredSlices.rx2",
         "450OneHundredBars.rx2",
     };
 }
@@ -553,6 +555,59 @@ TEST_CASE("WAV fixtures are valid PCM references") {
         ++wavCount;
     }
     CHECK(wavCount == 17);
+}
+
+TEST_CASE("mono slice rendering matches decoded DWOP trace after render offset") {
+    VLError err = VL_OK;
+    ScopedVLFile file(vl_open((kDataDir / "120Mono.rx2").string().c_str(), &err));
+    REQUIRE(file);
+    REQUIRE(err == VL_OK);
+
+    VLFileInfo info = {};
+    REQUIRE(vl_get_info(file.handle, &info) == VL_OK);
+
+    const int32_t frames = vl_get_slice_frame_count(file.handle, 0);
+    REQUIRE(frames >= 10);
+
+    std::vector<float> left((size_t)frames);
+    int32_t written = 0;
+    REQUIRE(vl_decode_slice(file.handle, 0, left.data(), nullptr, frames, &written) == VL_OK);
+    CHECK(written == frames);
+
+    const int32_t expected[] = {-410, -209, 205, 564, 709, 585, 161, -349, -637, -561};
+    const float gain = (float)info.processing_gain * 0.000833333354f;
+    REQUIRE(gain > 0.0f);
+    for (size_t i = 0; i < std::size(expected); ++i) {
+        CAPTURE(i);
+        CHECK((int32_t)std::lround(left[i] * 32768.0f / gain) == expected[i]);
+    }
+}
+
+TEST_CASE("stereo files synthesize the leading loop slice reported by the official SDK") {
+    VLError err = VL_OK;
+    ScopedVLFile file(vl_open((kDataDir / "120Stereo.rx2").string().c_str(), &err));
+    REQUIRE(file);
+    REQUIRE(err == VL_OK);
+
+    VLFileInfo info = {};
+    REQUIRE(vl_get_info(file.handle, &info) == VL_OK);
+    CHECK(info.slice_count == 10);
+
+    VLSliceInfo first = {};
+    REQUIRE(vl_get_slice_info(file.handle, 0, &first) == VL_OK);
+    CHECK(first.ppq_pos == 0);
+    CHECK(first.sample_start == info.loop_start);
+    CHECK(first.sample_length == 10890);
+    CHECK(vl_get_slice_frame_count(file.handle, 0) == 16069);
+
+    const int32_t frames = vl_get_slice_frame_count(file.handle, 0);
+    std::vector<float> left((size_t)frames);
+    std::vector<float> right((size_t)frames);
+    int32_t written = 0;
+    REQUIRE(vl_decode_slice(file.handle, 0, left.data(), right.data(), frames, &written) == VL_OK);
+    CHECK(written == frames);
+    CHECK(left[0] == doctest::Approx(-0.010498f).epsilon(0.001f));
+    CHECK(right[0] == doctest::Approx(-0.009613f).epsilon(0.001f));
 }
 
 TEST_CASE("all test data files are classified by the public opener") {
