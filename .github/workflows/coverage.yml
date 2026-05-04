@@ -44,7 +44,6 @@ jobs:
         run: |
           lcov -c -d build \
             --ignore-errors mismatch,unused,inconsistent,unsupported \
-            --include "*/include/*" \
             --include "*/src/*.cpp" \
             -o build/coverage.info
 
