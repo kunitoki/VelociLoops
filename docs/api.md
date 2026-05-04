@@ -549,6 +549,6 @@ freed.  Unknown codes return `"unknown error"`.
 const char* vl_version_string(void);
 ```
 
-Return the library version string (e.g. `"velociloops 0.1.0"`).
+Return the library version string (e.g. `"0.1.0"`).
 
 The returned pointer is valid for the lifetime of the process.
