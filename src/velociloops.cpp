@@ -1795,7 +1795,8 @@ private:
         {
             const int32_t timeSigNum = info.time_sig_num > 0 ? info.time_sig_num : 4;
             const int32_t totalBeats = (int32_t)globBars * timeSigNum + (int32_t)globBeats;
-            info.ppq_length = totalBeats > 0 ? totalBeats * kREXPPQ : 4 * kREXPPQ;
+            const int64_t ppqLen = totalBeats > 0 ? (int64_t)totalBeats * kREXPPQ : (int64_t)4 * kREXPPQ;
+            info.ppq_length = (int32_t)std::clamp(ppqLen, (int64_t)1, (int64_t)INT32_MAX);
         }
         processingGain = be16(d + 12);
         silenceSelected = d[21] != 0;
