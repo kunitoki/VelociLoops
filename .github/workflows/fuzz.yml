@@ -43,10 +43,11 @@ jobs:
       - name: Fuzz
         run: |
           ./build-fuzz/fuzz/velociloops_fuzzer \
-            fuzz/data/ \
             -max_total_time=60 \
             -max_len=980128 \
             -rss_limit_mb=512 \
+            -entropic=0 \
+            fuzz/data/ \
             tests/data/
         env:
           ASAN_OPTIONS: halt_on_error=1:detect_leaks=0

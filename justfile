@@ -47,7 +47,7 @@ fuzz:
     ASAN_OPTIONS=halt_on_error=1:detect_leaks=0 \
     UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
         ./build-fuzz/fuzz/velociloops_fuzzer \
-        fuzz/data/ -max_total_time=30 -max_len=980128 -rss_limit_mb=512 tests/data/
+        -max_total_time=30 -max_len=980128 -rss_limit_mb=512 -entropic=0 fuzz/data/ tests/data/
 
 format:
     clang-format --style=file -i include/*.h src/*.cpp tests/*.cpp
