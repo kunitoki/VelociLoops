@@ -30,7 +30,7 @@ jobs:
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DVELOCILOOPS_SANITIZERS=ON
+            -DVELOCILOOPS_ENABLE_SANITIZERS=ON
 
       - name: Build
         run: cmake --build build --parallel

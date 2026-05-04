@@ -367,20 +367,6 @@ and performs file loading, slice creation, saving, and buffer allocation outside
 the audio callback.
 
 
-#### `vl_set_output_sample_rate`
-
-```c
-VLError vl_set_output_sample_rate(VLFile file, int32_t rate);
-```
-
-Set the output sample rate for `vl_decode_slice()`.
-
-Resampling is not yet implemented.  Returns `VL_ERROR_NOT_IMPLEMENTED` if
-`rate` differs from the file's native rate.
-
-**Returns** `VL_OK` when `rate` matches the native rate.
-
-
 #### `vl_get_slice_frame_count`
 
 ```c

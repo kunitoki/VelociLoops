@@ -1,4 +1,3 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "velociloops.h"
 
 #include <doctest/doctest.h>
@@ -695,7 +694,6 @@ TEST_CASE("invalid API arguments return errors")
     CHECK(vl_get_creator_info(nullptr, nullptr) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_get_slice_info(nullptr, 0, nullptr) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_set_slice_info(nullptr, 0, 0, -1) == VL_ERROR_INVALID_HANDLE);
-    CHECK(vl_set_output_sample_rate(nullptr, 44100) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_get_slice_frame_count(nullptr, 0) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_decode_slice(nullptr, 0, nullptr, nullptr, 0, 0, nullptr) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_set_info(nullptr, nullptr) == VL_ERROR_INVALID_HANDLE);
@@ -1212,11 +1210,6 @@ TEST_CASE("every decodable fixture renders every slice and roundtrips through me
         CHECK(vl_set_slice_info(file.handle, info.slice_count, 0, -1) == VL_ERROR_INVALID_SLICE);
         CHECK(vl_get_slice_frame_count(file.handle, -1) == VL_ERROR_INVALID_SLICE);
         CHECK(vl_get_slice_frame_count(file.handle, info.slice_count) == VL_ERROR_INVALID_SLICE);
-
-        CHECK(vl_set_output_sample_rate(file.handle, 1) == VL_ERROR_INVALID_SAMPLE_RATE);
-        CHECK(vl_set_output_sample_rate(file.handle, info.sample_rate) == VL_OK);
-        const int32_t otherRate = info.sample_rate == 44100 ? 48000 : 44100;
-        CHECK(vl_set_output_sample_rate(file.handle, otherRate) == VL_ERROR_NOT_IMPLEMENTED);
 
         VLCreatorInfo creator = {};
         const VLError creatorResult = vl_get_creator_info(file.handle, &creator);

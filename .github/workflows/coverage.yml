@@ -32,7 +32,7 @@ jobs:
         run: sudo apt-get install -y lcov
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DVELOCILOOPS_COVERAGE=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DVELOCILOOPS_ENABLE_COVERAGE=ON
 
       - name: Build
         run: cmake --build build --parallel $(nproc)

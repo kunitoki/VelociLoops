@@ -498,21 +498,6 @@ VLError vl_set_slice_info(VLFile file, int32_t index, int32_t flags, int32_t ana
    ----------------------------------------------------------------------- */
 
 /**
- * @brief Set the output sample rate for subsequent vl_decode_slice() calls.
- *
- * Stores @p rate for future use.  Resampling is not yet implemented; calling
- * this function with a rate that differs from the file's native rate currently
- * returns VL_ERROR_NOT_IMPLEMENTED.
- *
- * @param file  Open VLFile handle.
- * @param rate  Desired output sample rate in Hz.
- * @return      VL_OK if @p rate matches the file's native rate.
- *              VL_ERROR_NOT_IMPLEMENTED for any other non-zero rate.
- *              VL_ERROR_INVALID_ARG if @p rate <= 0.
- */
-VLError vl_set_output_sample_rate(VLFile file, int32_t rate);
-
-/**
  * @brief Return the number of frames vl_decode_slice() will write for a slice.
  *
  * This value accounts for any transient-stretch tail appended beyond the raw

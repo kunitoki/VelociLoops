@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <complex>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -13,12 +12,15 @@
 #include <string>
 #include <vector>
 
+
 /* -----------------------------------------------------------------------
    DWOP decompressor
    ----------------------------------------------------------------------- */
 
 namespace
 {
+
+#include "fft8g.h"
 
 inline int32_t clampInt32(int64_t v)
 {
@@ -2413,7 +2415,6 @@ std::vector<uint8_t> buildREX2File(VLFileImpl& impl)
 struct VLFile_s
 {
     VLFileImpl impl;
-    int32_t outputSampleRate = 44100;
 };
 
 /* -----------------------------------------------------------------------
@@ -2490,38 +2491,6 @@ VLError validateSuperFluxOptions(const VLSuperFluxOptions& o, int32_t sampleRate
         return VL_ERROR_INVALID_ARG;
 
     return VL_OK;
-}
-
-void fftRadix2(std::vector<std::complex<float>>& a)
-{
-    const size_t n = a.size();
-    for (size_t i = 1, j = 0; i < n; ++i)
-    {
-        size_t bit = n >> 1;
-        for (; j & bit; bit >>= 1)
-            j ^= bit;
-        j ^= bit;
-        if (i < j)
-            std::swap(a[i], a[j]);
-    }
-
-    for (size_t len = 2; len <= n; len <<= 1)
-    {
-        const float angle = (float)(-kVLTwoPi / (double)len);
-        const std::complex<float> wlen(std::cos(angle), std::sin(angle));
-        for (size_t i = 0; i < n; i += len)
-        {
-            std::complex<float> w(1.0f, 0.0f);
-            for (size_t j = 0; j < len / 2; ++j)
-            {
-                const std::complex<float> u = a[i + j];
-                const std::complex<float> v = a[i + j + len / 2] * w;
-                a[i + j] = u + v;
-                a[i + j + len / 2] = u - v;
-                w *= wlen;
-            }
-        }
-    }
 }
 
 std::vector<float> makeHannWindow(int32_t frameSize)
@@ -2643,8 +2612,10 @@ bool computeSuperFluxActivations(const float* left,
         return false;
 
     std::vector<float> spec((size_t)numFrames * (size_t)numBands, 0.0f);
-    std::vector<std::complex<float>> fftBuffer((size_t)frameSize);
+    std::vector<double> fftBuffer((size_t)frameSize);
     std::vector<float> magnitudes((size_t)numFftBins);
+    std::vector<int> fftIp(2 + (size_t)frameSize, 0);
+    std::vector<double> fftW((size_t)frameSize / 2);
 
     for (int32_t frame = 0; frame < numFrames; ++frame)
     {
@@ -2668,13 +2639,18 @@ bool computeSuperFluxActivations(const float* left,
                     sample = l;
                 }
             }
-            fftBuffer[(size_t)i] = std::complex<float>(sample * window[(size_t)i], 0.0f);
+            fftBuffer[(size_t)i] = (double)(sample * window[(size_t)i]);
         }
 
-        fftRadix2(fftBuffer);
+        rdft(frameSize, 1, fftBuffer.data(), fftIp.data(), fftW.data());
 
-        for (int32_t bin = 0; bin < numFftBins; ++bin)
-            magnitudes[(size_t)bin] = std::abs(fftBuffer[(size_t)bin]);
+        magnitudes[0] = (float)std::abs(fftBuffer[0]);
+        for (int32_t bin = 1; bin < numFftBins; ++bin)
+        {
+            const double re = fftBuffer[(size_t)bin * 2];
+            const double im = fftBuffer[(size_t)bin * 2 + 1];
+            magnitudes[(size_t)bin] = (float)std::sqrt(re * re + im * im);
+        }
 
         for (int32_t band = 0; band < numBands; ++band)
         {
@@ -2923,7 +2899,6 @@ VLFile vl_open_from_memory(const void* data, size_t size, VLError* err)
         return nullptr;
     }
 
-    h->outputSampleRate = h->impl.info.sample_rate ? h->impl.info.sample_rate : 44100;
     set(VL_OK);
     return h;
 }
@@ -2960,8 +2935,6 @@ VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLErr
         set(VL_ERROR_OUT_OF_MEMORY);
         return nullptr;
     }
-
-    h->outputSampleRate = sample_rate;
 
     h->impl.info.channels = channels;
     h->impl.info.sample_rate = sample_rate;
@@ -3075,11 +3048,9 @@ VLFile vl_create_from_superflux(int32_t channels,
 
         const double beats = ((double)frames * (double)tempo) / (60000.0 * (double)sample_rate);
         info.ppq_length = std::max(1, (int32_t)std::lround(beats * (double)VLFileImpl::kREXPPQ));
-        const int32_t totalBeats = std::max(1, (int32_t)std::lround(beats));
-        const int64_t musicalFrames = ((int64_t)totalBeats * (int64_t)sample_rate * 60000LL) / (int64_t)tempo;
         info.total_frames = frames;
         info.loop_start = 0;
-        info.loop_end = (int32_t)std::min(musicalFrames, (int64_t)frames);
+        info.loop_end = frames;
         info.transient_enabled = 0;
         info.transient_stretch = 0;
         info.transient_attack = 0;
@@ -3218,21 +3189,6 @@ VLError vl_set_slice_info(VLFile file, int32_t index, int32_t flags, int32_t ana
 /* -----------------------------------------------------------------------
    Read: sample extraction
    ----------------------------------------------------------------------- */
-
-VLError vl_set_output_sample_rate(VLFile file, int32_t rate)
-{
-    if (!file)
-        return VL_ERROR_INVALID_HANDLE;
-
-    if (rate < 8000 || rate > 192000)
-        return VL_ERROR_INVALID_SAMPLE_RATE;
-
-    if (rate != file->impl.info.sample_rate)
-        return VL_ERROR_NOT_IMPLEMENTED;
-
-    file->outputSampleRate = rate;
-    return VL_OK;
-}
 
 int32_t vl_get_slice_frame_count(VLFile file, int32_t index)
 {
@@ -3404,7 +3360,6 @@ VLError vl_set_info(VLFile file, const VLFileInfo* info)
     file->impl.transientDecay = (uint16_t)std::clamp(info->transient_decay > 0 ? info->transient_decay : 1023, 0, 1023);
     file->impl.transientStretch = (uint16_t)std::clamp(info->transient_stretch, 0, 100);
     file->impl.silenceSelected = info->silence_selected != 0;
-    file->outputSampleRate = info->sample_rate;
 
     return VL_OK;
 }
