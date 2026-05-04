@@ -48,6 +48,7 @@ exposes per-slice float audio, and supports a full read/write round-trip.
 ### Authoring and mutation
 
 - **Create new RX2 files** — Build mono or stereo loops from caller-supplied float slices.
+- **SuperFlux auto-slicing** — Build a save-ready loop from full-loop mono or stereo float PCM using onset detection.
 - **Set file and creator metadata before writing** — Configure tempo, original tempo, time signature, bit depth, transient settings, and creator fields before adding audio.
 - **Append and remove slices** — Add slices by PPQ position and remove existing slices by index.
 - **Round-trip by re-encoding** — Decode existing slices to float audio, mutate metadata/slices, and save a fresh RX2 file.
@@ -79,6 +80,12 @@ executable.
 ```
 
 Extracts every slice as a WAV file and performs a save/reload round-trip check.
+
+```sh
+./build/demo/velociloops tests/data/120Stereo.wav out/120Stereo_auto.rx2 120
+```
+
+Auto-slices a WAV file with SuperFlux onset detection and writes a REX2 file.
 
 ### Embed in your project
 

@@ -50,10 +50,12 @@ target_link_libraries(my_app PRIVATE velociloops_library)
 #include <stdio.h>
 #include <stdlib.h>
 
-int main(void) {
+int main(void)
+{
     VLError err;
     VLFile  file = vl_open("loop.rx2", &err);
-    if (!file) {
+    if (!file)
+    {
         fprintf(stderr, "open failed: %s\n", vl_error_string(err));
         return 1;
     }
@@ -66,7 +68,8 @@ int main(void) {
            info.tempo / 1000.0, info.slice_count);
 
     /* Decode each slice to float buffers */
-    for (int i = 0; i < info.slice_count; ++i) {
+    for (int i = 0; i < info.slice_count; ++i)
+    {
         int32_t n = vl_get_slice_frame_count(file, i);
         float  *L = malloc(n * sizeof(float));
         float  *R = malloc(n * sizeof(float));  /* NULL for mono-only */
@@ -95,7 +98,8 @@ int main(void) {
 #include "velociloops.h"
 
 /* Assume `left` and `right` are float[frame_count] filled with audio data. */
-void write_example(const float* left, const float* right, int32_t frame_count) {
+void write_example(const float* left, const float* right, int32_t frame_count)
+{
     /* 1. Create handle: stereo, 44.1 kHz, 120 BPM */
     VLError err;
     VLFile  file = vl_create_new(2, 44100, 120000, &err);
@@ -110,7 +114,8 @@ void write_example(const float* left, const float* right, int32_t frame_count) {
     /* 3. Add slices in ascending ppq_pos order */
     /*    ppq_pos=0 places the first slice at the very start of the loop */
     int32_t idx = vl_add_slice(file, 0, left, right, frame_count);
-    if (idx < 0) {
+    if (idx < 0)
+    {
         vl_close(file);
         return;
     }
@@ -134,7 +139,8 @@ optionally writing the error code to an `err` out-parameter.
 ```c
 VLError err;
 VLFile  f = vl_open("loop.rx2", &err);
-if (!f) {
+if (!f)
+{
     /* vl_error_string() never returns NULL */
     fprintf(stderr, "error %d: %s\n", (int)err, vl_error_string(err));
     return;
@@ -142,9 +148,8 @@ if (!f) {
 
 VLFileInfo info;
 VLError e = vl_get_info(f, &info);
-if (e != VL_OK) {
+if (e != VL_OK)
     fprintf(stderr, "get_info: %s\n", vl_error_string(e));
-}
 
 vl_close(f);
 ```

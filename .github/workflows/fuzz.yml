@@ -34,7 +34,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DVELOCILOOPS_SANITIZERS=ON \
+            -DVELOCILOOPS_ENABLE_SANITIZERS=ON \
             -DVELOCILOOPS_ENABLE_FUZZING=ON
 
       - name: Build
@@ -42,11 +42,12 @@ jobs:
 
       - name: Fuzz
         run: |
-          ./build-fuzz/tests/velociloops_fuzzer \
-            tests/fuzz/ \
+          ./build-fuzz/fuzz/velociloops_fuzzer \
             -max_total_time=60 \
             -max_len=980128 \
             -rss_limit_mb=512 \
+            -entropic=0 \
+            fuzz/data/ \
             tests/data/
         env:
           ASAN_OPTIONS: halt_on_error=1:detect_leaks=0

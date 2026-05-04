@@ -12,12 +12,15 @@
 #include <string>
 #include <vector>
 
+
 /* -----------------------------------------------------------------------
    DWOP decompressor
    ----------------------------------------------------------------------- */
 
 namespace
 {
+
+#include "fft8g.h"
 
 inline int32_t clampInt32(int64_t v)
 {
@@ -1088,6 +1091,9 @@ public:
     bool silenceSelected = false;
     bool headerValid = true;
     VLError loadError = VL_OK;
+    bool loadedFromFile = false;
+    uint16_t globBars = 1;
+    uint8_t globBeats = 0;
 
     static constexpr int32_t kREXPPQ = 15360;
 
@@ -1117,6 +1123,9 @@ public:
         gateSensitivity = 0;
         headerValid = true;
         loadError = VL_OK;
+        loadedFromFile = false;
+        globBars = 1;
+        globBeats = 0;
 
         std::memset(&creator, 0, sizeof(creator));
 
@@ -1126,7 +1135,10 @@ public:
         if (fileData[0] == 'F' && fileData[1] == 'O' && fileData[2] == 'R' && fileData[3] == 'M' && fileData[8] == 'A' && fileData[9] == 'I' &&
             fileData[10] == 'F' && fileData[11] == 'F')
         {
-            return loadLegacyAIFF();
+            const bool ok = loadLegacyAIFF();
+            if (ok)
+                loadedFromFile = true;
+            return ok;
         }
 
         if (fileData[0] != 'C' || fileData[1] != 'A' || fileData[2] != 'T' || fileData[3] != ' ')
@@ -1184,6 +1196,7 @@ public:
             return fail(VL_ERROR_FILE_CORRUPT);
 
         finalizeRenderedLengths();
+        loadedFromFile = true;
         return true;
     }
 
@@ -1769,6 +1782,8 @@ private:
         }
 
         info.slice_count = (int32_t)be32(d);
+        globBars = be16(d + 4);
+        globBeats = d[6];
         info.time_sig_num = d[7];
         info.time_sig_den = d[8];
         analysisSensitivity = d[9];
@@ -1777,11 +1792,17 @@ private:
         if (tempo < 20000u || tempo > 450000u)
             fail(VL_ERROR_INVALID_TEMPO);
         info.tempo = (int32_t)tempo;
-        info.ppq_length = 61440;
+        {
+            const int32_t timeSigNum = info.time_sig_num > 0 ? info.time_sig_num : 4;
+            const int32_t totalBeats = (int32_t)globBars * timeSigNum + (int32_t)globBeats;
+            const int64_t ppqLen = totalBeats > 0 ? (int64_t)totalBeats * kREXPPQ : (int64_t)4 * kREXPPQ;
+            info.ppq_length = (int32_t)std::clamp(ppqLen, (int64_t)1, (int64_t)INT32_MAX);
+        }
         processingGain = be16(d + 12);
         silenceSelected = d[21] != 0;
         info.processing_gain = processingGain;
         info.silence_selected = silenceSelected ? 1 : 0;
+        loadedFromFile = true;
     }
 
     void parseCREI(const uint8_t* d, uint32_t sz)
@@ -1876,8 +1897,8 @@ private:
 
     static uint16_t rex2FilterPoints(uint8_t sensitivity)
     {
-        const uint32_t sens = std::min<uint32_t>(sensitivity, 100u);
-        const uint32_t visibleRange = (sens * 0x7fffu + 99u) / 100u;
+        const uint32_t sens = std::min<uint32_t>(sensitivity, 99u);
+        const uint32_t visibleRange = (sens * 0x7fffu + 98u) / 99u;
         return (uint16_t)(0x7fffu - visibleRange);
     }
 
@@ -2231,6 +2252,9 @@ void normaliseInfoForSave(VLFileImpl& impl)
     impl.loopStart = (uint32_t)std::max(0, impl.info.loop_start);
     impl.loopEnd = (uint32_t)std::max(impl.info.loop_start, impl.info.loop_end);
 
+    if (!impl.loadedFromFile && impl.analysisSensitivity == 0)
+        impl.analysisSensitivity = 99;
+
     if (impl.info.ppq_length <= 0)
     {
         const uint32_t frames = impl.loopEnd > impl.loopStart ? impl.loopEnd - impl.loopStart : impl.totalFrames;
@@ -2238,6 +2262,13 @@ void normaliseInfoForSave(VLFileImpl& impl)
         const double beats = frames > 0 ? ((double)frames * (double)impl.info.tempo) / (60000.0 * (double)impl.info.sample_rate) : 4.0;
 
         impl.info.ppq_length = std::max(1, (int32_t)std::lround(beats * VLFileImpl::kREXPPQ));
+    }
+
+    {
+        const int32_t timeSigNum = impl.info.time_sig_num > 0 ? impl.info.time_sig_num : 4;
+        const int32_t totalBeats = std::max(1, (impl.info.ppq_length + VLFileImpl::kREXPPQ / 2) / VLFileImpl::kREXPPQ);
+        impl.globBars = (uint16_t)(totalBeats / timeSigNum);
+        impl.globBeats = (uint8_t)(totalBeats % timeSigNum);
     }
 
     impl.processingGain = (uint16_t)std::clamp(impl.info.processing_gain > 0 ? impl.info.processing_gain : 1000, 0, 1000);
@@ -2282,14 +2313,13 @@ std::vector<uint8_t> buildREX2File(VLFileImpl& impl)
     {
         const size_t c = w.beginChunk("GLOB");
         w.put32((uint32_t)impl.slices.size());
-        w.put8(0);
-        w.put8(1);
-        w.put8(0);
+        w.put16(impl.globBars);
+        w.put8(impl.globBeats);
         w.put8((uint8_t)impl.info.time_sig_num);
         w.put8((uint8_t)impl.info.time_sig_den);
-        w.put8(0x4e);
-        w.put8(0);
-        w.put8(0);
+        w.put8(impl.analysisSensitivity);
+        const uint16_t gate = impl.slices.empty() ? impl.gateSensitivity : std::max<uint16_t>(1, impl.gateSensitivity);
+        w.put16(gate);
         w.put16(impl.processingGain);
         w.put16(1);
         w.put32((uint32_t)impl.info.tempo);
@@ -2307,10 +2337,8 @@ std::vector<uint8_t> buildREX2File(VLFileImpl& impl)
         w.put8(0);
         w.put8(1);
         w.put8(0);
-        w.put8(0);
-        w.put32((uint32_t)impl.info.original_tempo);
-        w.put16(0);
-        w.put8(8);
+        w.put32((uint32_t)(impl.totalFrames * impl.info.channels * (impl.info.bit_depth / 8)));
+        w.put32((uint32_t)impl.slices.size());
         w.endChunk(c);
     }
 
@@ -2388,9 +2416,6 @@ std::vector<uint8_t> buildREX2File(VLFileImpl& impl)
 struct VLFile_s
 {
     VLFileImpl impl;
-    int32_t outputSampleRate = 44100;
-    bool isNew = false;
-    bool dirty = false;
 };
 
 /* -----------------------------------------------------------------------
@@ -2399,6 +2424,354 @@ struct VLFile_s
 
 namespace
 {
+
+constexpr double kVLTwoPi = 6.283185307179586476925286766559;
+
+bool isPowerOfTwo(int32_t value)
+{
+    return value > 0 && (value & (value - 1)) == 0;
+}
+
+VLSuperFluxOptions superfluxDefaults()
+{
+    VLSuperFluxOptions o = {};
+    o.frame_size = 2048;
+    o.fps = 200;
+    o.filter_bands = 24;
+    o.max_bins = 3;
+    o.diff_frames = 0;
+    o.min_slice_frames = 0;
+    o.filter_equal = 0;
+    o.online = 0;
+    o.threshold = 1.1f;
+    o.combine_ms = 50.0f;
+    o.pre_avg = 0.15f;
+    o.pre_max = 0.01f;
+    o.post_avg = 0.0f;
+    o.post_max = 0.05f;
+    o.delay_ms = 0.0f;
+    o.ratio = 0.5f;
+    o.fmin = 30.0f;
+    o.fmax = 17000.0f;
+    o.log_mul = 1.0f;
+    o.log_add = 1.0f;
+    return o;
+}
+
+VLError validateSuperFluxOptions(const VLSuperFluxOptions& o, int32_t sampleRate)
+{
+    if (!isPowerOfTwo(o.frame_size) || o.frame_size < 64 || o.frame_size > 32768)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.fps <= 0 || o.fps > sampleRate)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.filter_bands < 1 || o.max_bins < 1)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.diff_frames < 0)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.min_slice_frames < 0)
+        return VL_ERROR_INVALID_ARG;
+
+    if (!std::isfinite(o.threshold) || !std::isfinite(o.combine_ms) || !std::isfinite(o.pre_avg) || !std::isfinite(o.pre_max) ||
+        !std::isfinite(o.post_avg) || !std::isfinite(o.post_max) || !std::isfinite(o.delay_ms) || !std::isfinite(o.ratio) ||
+        !std::isfinite(o.fmin) || !std::isfinite(o.fmax) || !std::isfinite(o.log_mul) || !std::isfinite(o.log_add))
+    {
+        return VL_ERROR_INVALID_ARG;
+    }
+
+    if (o.combine_ms < 0.0f || o.pre_avg < 0.0f || o.pre_max < 0.0f || o.post_avg < 0.0f || o.post_max < 0.0f)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.ratio < 0.0f || o.ratio > 1.0f)
+        return VL_ERROR_INVALID_ARG;
+
+    if (o.fmin <= 0.0f || o.fmax <= o.fmin || o.log_mul <= 0.0f || o.log_add <= 0.0f)
+        return VL_ERROR_INVALID_ARG;
+
+    return VL_OK;
+}
+
+std::vector<float> makeHannWindow(int32_t frameSize)
+{
+    std::vector<float> window((size_t)frameSize, 1.0f);
+    if (frameSize <= 1)
+        return window;
+
+    for (int32_t i = 0; i < frameSize; ++i)
+        window[(size_t)i] = (float)(0.5 - 0.5 * std::cos(kVLTwoPi * (double)i / (double)(frameSize - 1)));
+
+    return window;
+}
+
+std::vector<float> superfluxFrequencies(int32_t bands, float fmin, float fmax)
+{
+    std::vector<float> frequencies;
+    const double factor = std::pow(2.0, 1.0 / (double)bands);
+
+    double freq = 440.0;
+    frequencies.push_back((float)freq);
+    while (freq <= (double)fmax)
+    {
+        freq *= factor;
+        frequencies.push_back((float)freq);
+    }
+
+    freq = 440.0;
+    while (freq >= (double)fmin)
+    {
+        freq /= factor;
+        frequencies.push_back((float)freq);
+    }
+
+    std::sort(frequencies.begin(), frequencies.end());
+    return frequencies;
+}
+
+bool buildSuperFluxFilterbank(int32_t numFftBins,
+                              int32_t sampleRate,
+                              const VLSuperFluxOptions& options,
+                              std::vector<float>& filterbank,
+                              int32_t& numBands)
+{
+    const float fmax = std::min(options.fmax, (float)sampleRate * 0.5f);
+    std::vector<float> frequencies = superfluxFrequencies(options.filter_bands, options.fmin, fmax);
+    const double factor = ((double)sampleRate * 0.5) / (double)numFftBins;
+
+    std::vector<int32_t> bins;
+    bins.reserve(frequencies.size());
+    for (float frequency : frequencies)
+    {
+        const int32_t bin = (int32_t)std::lround((double)frequency / factor);
+        if (bin >= 0 && bin < numFftBins)
+            bins.push_back(bin);
+    }
+
+    std::sort(bins.begin(), bins.end());
+    bins.erase(std::unique(bins.begin(), bins.end()), bins.end());
+    if (bins.size() < 5)
+        return false;
+
+    numBands = (int32_t)bins.size() - 2;
+    if (numBands < 3)
+        return false;
+
+    filterbank.assign((size_t)numFftBins * (size_t)numBands, 0.0f);
+    for (int32_t band = 0; band < numBands; ++band)
+    {
+        const int32_t start = bins[(size_t)band];
+        const int32_t mid = bins[(size_t)band + 1u];
+        const int32_t stop = bins[(size_t)band + 2u];
+        if (mid <= start || stop <= mid)
+            continue;
+
+        const float height = options.filter_equal ? 2.0f / (float)(stop - start) : 1.0f;
+        for (int32_t bin = start; bin < mid; ++bin)
+        {
+            const float t = (float)(bin - start) / (float)(mid - start);
+            filterbank[(size_t)bin * (size_t)numBands + (size_t)band] = t * height;
+        }
+        for (int32_t bin = mid; bin < stop; ++bin)
+        {
+            const float t = (float)(bin - mid) / (float)(stop - mid);
+            filterbank[(size_t)bin * (size_t)numBands + (size_t)band] = (1.0f - t) * height;
+        }
+    }
+
+    return true;
+}
+
+int32_t deriveSuperFluxDiffFrames(const std::vector<float>& window, double hopSize, float ratio)
+{
+    size_t sample = 0;
+    while (sample < window.size() && window[sample] <= ratio)
+        ++sample;
+
+    const double diffSamples = (double)window.size() * 0.5 - (double)sample;
+    return std::max(1, (int32_t)std::lround(diffSamples / hopSize));
+}
+
+bool computeSuperFluxActivations(const float* left,
+                                 const float* right,
+                                 int32_t channels,
+                                 int32_t frames,
+                                 int32_t sampleRate,
+                                 const VLSuperFluxOptions& options,
+                                 std::vector<float>& activations)
+{
+    const int32_t frameSize = options.frame_size;
+    const int32_t numFftBins = frameSize / 2;
+    const double hopSize = (double)sampleRate / (double)options.fps;
+    const int32_t numFrames = std::max(1, (int32_t)std::ceil((double)frames / hopSize));
+
+    std::vector<float> window = makeHannWindow(frameSize);
+    std::vector<float> filterbank;
+    int32_t numBands = 0;
+    if (!buildSuperFluxFilterbank(numFftBins, sampleRate, options, filterbank, numBands))
+        return false;
+
+    std::vector<float> spec((size_t)numFrames * (size_t)numBands, 0.0f);
+    std::vector<double> fftBuffer((size_t)frameSize);
+    std::vector<float> magnitudes((size_t)numFftBins);
+    std::vector<int> fftIp(2 + (size_t)frameSize, 0);
+    std::vector<double> fftW((size_t)frameSize / 2);
+
+    for (int32_t frame = 0; frame < numFrames; ++frame)
+    {
+        const int32_t seek = options.online ? (int32_t)((double)(frame + 1) * hopSize - (double)frameSize)
+                                            : (int32_t)((double)frame * hopSize - (double)frameSize * 0.5);
+
+        for (int32_t i = 0; i < frameSize; ++i)
+        {
+            const int32_t src = seek + i;
+            float sample = 0.0f;
+            if (src >= 0 && src < frames)
+            {
+                const float l = std::isfinite(left[src]) ? left[src] : 0.0f;
+                if (channels == 2)
+                {
+                    const float r = std::isfinite(right[src]) ? right[src] : 0.0f;
+                    sample = (l + r) * 0.5f;
+                }
+                else
+                {
+                    sample = l;
+                }
+            }
+            fftBuffer[(size_t)i] = (double)(sample * window[(size_t)i]);
+        }
+
+        rdft(frameSize, 1, fftBuffer.data(), fftIp.data(), fftW.data());
+
+        magnitudes[0] = (float)std::abs(fftBuffer[0]);
+        for (int32_t bin = 1; bin < numFftBins; ++bin)
+        {
+            const double re = fftBuffer[(size_t)bin * 2];
+            const double im = fftBuffer[(size_t)bin * 2 + 1];
+            magnitudes[(size_t)bin] = (float)std::sqrt(re * re + im * im);
+        }
+
+        for (int32_t band = 0; band < numBands; ++band)
+        {
+            double value = 0.0;
+            for (int32_t bin = 0; bin < numFftBins; ++bin)
+                value += (double)magnitudes[(size_t)bin] * (double)filterbank[(size_t)bin * (size_t)numBands + (size_t)band];
+
+            const float logged = std::log10(options.log_mul * (float)value + options.log_add);
+            spec[(size_t)frame * (size_t)numBands + (size_t)band] = logged;
+        }
+    }
+
+    const int32_t diffFrames =
+        options.diff_frames > 0 ? options.diff_frames : deriveSuperFluxDiffFrames(window, hopSize, options.ratio);
+
+    activations.assign((size_t)numFrames, 0.0f);
+    for (int32_t frame = diffFrames; frame < numFrames; ++frame)
+    {
+        float sum = 0.0f;
+        const int32_t prevFrame = frame - diffFrames;
+        for (int32_t band = 0; band < numBands; ++band)
+        {
+            int32_t first = band - options.max_bins / 2;
+            int32_t last = first + options.max_bins - 1;
+            if (first < 0)
+            {
+                last -= first;
+                first = 0;
+            }
+            if (last >= numBands)
+            {
+                first = std::max(0, first - (last - numBands + 1));
+                last = numBands - 1;
+            }
+            float prevMax = spec[(size_t)prevFrame * (size_t)numBands + (size_t)band];
+            for (int32_t k = first; k <= last; ++k)
+                prevMax = std::max(prevMax, spec[(size_t)prevFrame * (size_t)numBands + (size_t)k]);
+
+            const float diff = spec[(size_t)frame * (size_t)numBands + (size_t)band] - prevMax;
+            if (diff > 0.0f)
+                sum += diff;
+        }
+        activations[(size_t)frame] = sum;
+    }
+
+    return true;
+}
+
+std::vector<double> pickSuperFluxOnsets(const std::vector<float>& activations, int32_t fps, const VLSuperFluxOptions& options)
+{
+    const int32_t count = (int32_t)activations.size();
+    const int32_t preAvg = std::max(0, (int32_t)std::lround((double)fps * (double)options.pre_avg));
+    const int32_t preMax = std::max(0, (int32_t)std::lround((double)fps * (double)options.pre_max));
+    const int32_t postAvg = options.online ? 0 : std::max(0, (int32_t)std::lround((double)fps * (double)options.post_avg));
+    const int32_t postMax = options.online ? 0 : std::max(0, (int32_t)std::lround((double)fps * (double)options.post_max));
+    const double combineSeconds = (double)options.combine_ms / 1000.0;
+    const double delaySeconds = (double)options.delay_ms / 1000.0;
+
+    std::vector<double> detections;
+    double lastDetection = -std::numeric_limits<double>::infinity();
+    for (int32_t frame = 0; frame < count; ++frame)
+    {
+        const int32_t maxStart = std::max(0, frame - preMax);
+        const int32_t maxStop = std::min(count - 1, frame + postMax);
+        float movMax = 0.0f;
+        for (int32_t i = maxStart; i <= maxStop; ++i)
+            movMax = std::max(movMax, activations[(size_t)i]);
+
+        const int32_t avgStart = std::max(0, frame - preAvg);
+        const int32_t avgStop = std::min(count - 1, frame + postAvg);
+        double avg = 0.0;
+        for (int32_t i = avgStart; i <= avgStop; ++i)
+            avg += activations[(size_t)i];
+        avg /= (double)(avgStop - avgStart + 1);
+
+        const float value = activations[(size_t)frame];
+        if (value <= 0.0f || value != movMax || (double)value < avg + (double)options.threshold)
+            continue;
+
+        const double time = (double)frame / (double)fps + delaySeconds;
+        if (detections.empty() || time - lastDetection > combineSeconds)
+        {
+            detections.push_back(time);
+            lastDetection = time;
+        }
+    }
+
+    return detections;
+}
+
+std::vector<uint32_t> superfluxSliceBoundaries(const std::vector<double>& detections,
+                                               int32_t frames,
+                                               int32_t sampleRate,
+                                               const VLSuperFluxOptions& options)
+{
+    const uint32_t combineFrames =
+        (uint32_t)std::max(1, (int32_t)std::lround((double)options.combine_ms / 1000.0 * (double)sampleRate));
+    const uint32_t minSliceFrames =
+        (uint32_t)(options.min_slice_frames > 0 ? (uint32_t)options.min_slice_frames : std::max(combineFrames, (uint32_t)std::max(1, (int32_t)std::lround((double)sampleRate * 0.01))));
+
+    std::vector<uint32_t> boundaries;
+    boundaries.push_back(0);
+
+    for (double detection : detections)
+    {
+        const int64_t rounded = (int64_t)std::llround(detection * (double)sampleRate);
+        if (rounded <= 0 || rounded >= frames)
+            continue;
+
+        const uint32_t sample = (uint32_t)rounded;
+        if (sample - boundaries.back() >= minSliceFrames)
+            boundaries.push_back(sample);
+    }
+
+    if ((uint32_t)frames - boundaries.back() < minSliceFrames && boundaries.size() > 1)
+        boundaries.pop_back();
+
+    boundaries.push_back((uint32_t)frames);
+    return boundaries;
+}
 
 int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_pos, const float* left, const float* right, int32_t frames)
 {
@@ -2454,7 +2827,6 @@ int32_t addSliceAtSample(VLFile file, uint32_t sample_start, int32_t ppq_pos, co
     file->impl.info.slice_count = (int32_t)file->impl.slices.size();
     if (file->impl.info.loop_end <= file->impl.info.loop_start)
         file->impl.info.loop_end = file->impl.info.total_frames;
-    file->dirty = true;
 
     return (int32_t)file->impl.slices.size() - 1;
 }
@@ -2528,7 +2900,6 @@ VLFile vl_open_from_memory(const void* data, size_t size, VLError* err)
         return nullptr;
     }
 
-    h->outputSampleRate = h->impl.info.sample_rate ? h->impl.info.sample_rate : 44100;
     set(VL_OK);
     return h;
 }
@@ -2566,9 +2937,6 @@ VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLErr
         return nullptr;
     }
 
-    h->isNew = true;
-    h->outputSampleRate = sample_rate;
-
     h->impl.info.channels = channels;
     h->impl.info.sample_rate = sample_rate;
     h->impl.info.slice_count = 0;
@@ -2596,6 +2964,151 @@ VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLErr
 
     set(VL_OK);
     return h;
+}
+
+void vl_superflux_default_options(VLSuperFluxOptions* out)
+{
+    if (out)
+        *out = superfluxDefaults();
+}
+
+VLFile vl_create_from_superflux(int32_t channels,
+                                int32_t sample_rate,
+                                int32_t tempo,
+                                const float* left,
+                                const float* right,
+                                int32_t frames,
+                                const VLSuperFluxOptions* options,
+                                VLError* err)
+{
+    auto set = [&](VLError e)
+    {
+        if (err)
+            *err = e;
+    };
+
+    if (channels != 1 && channels != 2)
+    {
+        set(VL_ERROR_INVALID_ARG);
+        return nullptr;
+    }
+
+    if (sample_rate < 8000 || sample_rate > 192000)
+    {
+        set(VL_ERROR_INVALID_SAMPLE_RATE);
+        return nullptr;
+    }
+
+    if (tempo <= 0)
+    {
+        set(VL_ERROR_INVALID_TEMPO);
+        return nullptr;
+    }
+
+    if (!left || frames <= 0 || (channels == 2 && !right))
+    {
+        set(VL_ERROR_INVALID_ARG);
+        return nullptr;
+    }
+
+    VLSuperFluxOptions opts = options ? *options : superfluxDefaults();
+    VLError optionError = validateSuperFluxOptions(opts, sample_rate);
+    if (optionError != VL_OK)
+    {
+        set(optionError);
+        return nullptr;
+    }
+
+    try
+    {
+        std::vector<float> activations;
+        if (!computeSuperFluxActivations(left, right, channels, frames, sample_rate, opts, activations))
+        {
+            set(VL_ERROR_INVALID_ARG);
+            return nullptr;
+        }
+
+        const std::vector<double> detections = pickSuperFluxOnsets(activations, opts.fps, opts);
+        const std::vector<uint32_t> boundaries = superfluxSliceBoundaries(detections, frames, sample_rate, opts);
+
+        VLError createError = VL_OK;
+        VLFile file = vl_create_new(channels, sample_rate, tempo, &createError);
+        if (!file)
+        {
+            set(createError);
+            return nullptr;
+        }
+
+        VLFileInfo info = {};
+        if (vl_get_info(file, &info) != VL_OK)
+        {
+            vl_close(file);
+            set(VL_ERROR_INVALID_HANDLE); // LCOV_EXCL_LINE freshly-created handles are valid.
+            return nullptr;
+        }
+
+        const double beats = ((double)frames * (double)tempo) / (60000.0 * (double)sample_rate);
+        info.ppq_length = std::max(1, (int32_t)std::lround(beats * (double)VLFileImpl::kREXPPQ));
+        info.total_frames = frames;
+        info.loop_start = 0;
+        info.loop_end = frames;
+        info.transient_enabled = 0;
+        info.transient_stretch = 0;
+        info.transient_attack = 0;
+        info.transient_decay = 1023;
+        VLError infoError = vl_set_info(file, &info);
+        if (infoError != VL_OK)
+        {
+            vl_close(file);
+            set(infoError);
+            return nullptr;
+        }
+
+        int32_t previousPpq = -1;
+        for (size_t i = 0; i + 1 < boundaries.size(); ++i)
+        {
+            const uint32_t start = boundaries[i];
+            const uint32_t stop = boundaries[i + 1u];
+            if (stop <= start)
+                continue;
+
+            int32_t ppq = (int32_t)(((uint64_t)start * (uint64_t)info.ppq_length + (uint32_t)frames / 2u) / (uint32_t)frames);
+            if (ppq <= previousPpq)
+                ppq = previousPpq + 1;
+            ppq = std::min(ppq, std::max(0, info.ppq_length - 1));
+            previousPpq = ppq;
+
+            const int32_t sliceIndex =
+                addSliceAtSample(file, start, ppq, left + start, channels == 2 ? right + start : nullptr, (int32_t)(stop - start));
+            if (sliceIndex < 0)
+            {
+                const VLError sliceError = (VLError)sliceIndex;
+                vl_close(file);
+                set(sliceError);
+                return nullptr;
+            }
+        }
+
+        if (file->impl.slices.empty())
+        {
+            vl_close(file);
+            set(VL_ERROR_INVALID_ARG); // LCOV_EXCL_LINE boundaries always create at least one slice for frames > 0.
+            return nullptr;
+        }
+
+        set(VL_OK);
+        return file;
+    }
+    catch (const std::bad_alloc&)
+    {
+        set(VL_ERROR_OUT_OF_MEMORY);
+        return nullptr;
+    }
+    catch (...)
+    {
+        set(VL_ERROR_OUT_OF_MEMORY);
+        return nullptr;
+    }
 }
 
 void vl_close(VLFile file)
@@ -2671,28 +3184,12 @@ VLError vl_set_slice_info(VLFile file, int32_t index, int32_t flags, int32_t ana
     if (err != VL_OK)
         return err;
 
-    file->dirty = true;
     return VL_OK;
 }
 
 /* -----------------------------------------------------------------------
    Read: sample extraction
    ----------------------------------------------------------------------- */
-
-VLError vl_set_output_sample_rate(VLFile file, int32_t rate)
-{
-    if (!file)
-        return VL_ERROR_INVALID_HANDLE;
-
-    if (rate < 8000 || rate > 192000)
-        return VL_ERROR_INVALID_SAMPLE_RATE;
-
-    if (rate != file->impl.info.sample_rate)
-        return VL_ERROR_NOT_IMPLEMENTED;
-
-    file->outputSampleRate = rate;
-    return VL_OK;
-}
 
 int32_t vl_get_slice_frame_count(VLFile file, int32_t index)
 {
@@ -2864,8 +3361,6 @@ VLError vl_set_info(VLFile file, const VLFileInfo* info)
     file->impl.transientDecay = (uint16_t)std::clamp(info->transient_decay > 0 ? info->transient_decay : 1023, 0, 1023);
     file->impl.transientStretch = (uint16_t)std::clamp(info->transient_stretch, 0, 100);
     file->impl.silenceSelected = info->silence_selected != 0;
-    file->outputSampleRate = info->sample_rate;
-    file->dirty = true;
 
     return VL_OK;
 }
@@ -2887,7 +3382,6 @@ VLError vl_set_creator_info(VLFile file, const VLCreatorInfo* info)
     file->impl.creator.url[sizeof(file->impl.creator.url) - 1] = '\0';
     file->impl.creator.email[sizeof(file->impl.creator.email) - 1] = '\0';
     file->impl.creator.free_text[sizeof(file->impl.creator.free_text) - 1] = '\0';
-    file->dirty = true;
 
     return VL_OK;
 }
@@ -2914,7 +3408,6 @@ VLError vl_remove_slice(VLFile file, int32_t index)
 
     file->impl.slices.erase(file->impl.slices.begin() + index);
     file->impl.info.slice_count = (int32_t)file->impl.slices.size();
-    file->dirty = true;
 
     return VL_OK;
 }
@@ -2953,28 +3446,7 @@ VLError vl_save_to_memory(VLFile file, void* buf, size_t* size_out)
     if (!size_out)
         return VL_ERROR_INVALID_ARG;
 
-    if (!file->isNew && !file->dirty && !file->impl.fileData.empty())
-    {
-        const std::vector<uint8_t>& encoded = file->impl.fileData;
-
-        if (!buf)
-        {
-            *size_out = encoded.size();
-            return VL_OK;
-        }
-
-        if (*size_out < encoded.size())
-        {
-            *size_out = encoded.size();
-            return VL_ERROR_BUFFER_TOO_SMALL;
-        }
-
-        std::memcpy(buf, encoded.data(), encoded.size());
-        *size_out = encoded.size();
-        return VL_OK;
-    }
-
-    if (file->impl.slices.empty() || file->impl.pcm.empty())
+    if (file->impl.pcm.empty())
         return VL_ERROR_INVALID_ARG;
 
     std::vector<uint8_t> encoded = buildREX2File(file->impl);
@@ -3026,5 +3498,5 @@ const char* vl_error_string(VLError err)
 
 const char* vl_version_string(void)
 {
-    return "velociloops 0.1.0";
+    return "0.2.0";
 }

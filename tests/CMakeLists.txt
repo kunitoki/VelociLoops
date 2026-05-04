@@ -10,36 +10,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(doctest)
 
-add_executable(velociloops_tests test_velociloops.cpp)
-target_link_libraries(velociloops_tests PRIVATE velociloops_static doctest::doctest)
-target_compile_features(velociloops_tests PRIVATE cxx_std_17)
-target_compile_definitions(velociloops_tests
-    PRIVATE
-        VELOCILOOPS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
-)
+function(velociloops_declare_test TARGET_NAME)
+    add_executable(${TARGET_NAME} ${ARGN} test_main.cpp)
+    target_link_libraries(${TARGET_NAME} PRIVATE velociloops_static doctest::doctest)
+    target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            VELOCILOOPS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+    )
+    if (VELOCILOOPS_ENABLE_COVERAGE)
+        target_compile_options(${TARGET_NAME} PRIVATE --coverage)
+        target_link_options(${TARGET_NAME} PRIVATE --coverage)
+    endif()
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+endfunction()
 
-add_test(NAME velociloops_tests COMMAND velociloops_tests)
-
-if (VELOCILOOPS_COVERAGE)
-    target_compile_options(velociloops_tests PRIVATE --coverage)
-    target_link_options(velociloops_tests PRIVATE --coverage)
-endif()
-
-if (VELOCILOOPS_SANITIZERS)
-    target_compile_options(velociloops_tests PRIVATE
-        -fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(velociloops_tests PRIVATE
-        -fsanitize=address,undefined)
-endif()
-
-if (VELOCILOOPS_ENABLE_FUZZING)
-    add_executable(velociloops_fuzzer fuzz_velociloops.cpp)
-    target_link_libraries(velociloops_fuzzer PRIVATE velociloops_static)
-    target_compile_features(velociloops_fuzzer PRIVATE cxx_std_17)
-    target_compile_definitions(velociloops_fuzzer
-        PRIVATE VELOCILOOPS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
-    target_compile_options(velociloops_fuzzer PRIVATE
-        -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g)
-    target_link_options(velociloops_fuzzer PRIVATE
-        -fsanitize=fuzzer,address,undefined)
-endif()
+velociloops_declare_test(velociloops_tests test_velociloops.cpp)
+velociloops_declare_test(velociloops_superflux test_superflux.cpp)

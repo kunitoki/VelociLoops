@@ -30,13 +30,13 @@ jobs:
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DVELOCILOOPS_SANITIZERS=ON
+            -DVELOCILOOPS_ENABLE_SANITIZERS=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --parallel $(nproc)
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --parallel $(nproc) --output-on-failure
         env:
           ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
