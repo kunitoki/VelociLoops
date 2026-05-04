@@ -326,7 +326,7 @@ typedef struct
     int32_t online;           /**< Non-zero uses causal framing and peak picking. */
 
     float threshold;    /**< Peak-picking threshold over local average. Default: 1.1. */
-    float combine_ms;   /**< Suppress detections within this many ms. Default: 30. */
+    float combine_ms;   /**< Suppress detections within this many ms. Default: 50. */
     float pre_avg;      /**< Seconds before the peak for moving average. Default: 0.15. */
     float pre_max;      /**< Seconds before the peak for moving maximum. Default: 0.01. */
     float post_avg;     /**< Seconds after the peak for moving average. Default: 0.0. */
