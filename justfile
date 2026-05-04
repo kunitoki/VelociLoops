@@ -46,8 +46,8 @@ fuzz:
     cmake --build build-fuzz --parallel $(nproc) --target velociloops_fuzzer
     ASAN_OPTIONS=halt_on_error=1:detect_leaks=0 \
     UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-        ./build-fuzz/tests/velociloops_fuzzer \
-        tests/fuzz/ -max_total_time=30 -max_len=980128 -rss_limit_mb=512 tests/data/
+        ./build-fuzz/fuzz/velociloops_fuzzer \
+        fuzz/data/ -max_total_time=30 -max_len=980128 -rss_limit_mb=512 tests/data/
 
 format:
     clang-format --style=file -i include/*.h src/*.cpp tests/*.cpp

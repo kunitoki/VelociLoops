@@ -42,8 +42,8 @@ jobs:
 
       - name: Fuzz
         run: |
-          ./build-fuzz/tests/velociloops_fuzzer \
-            tests/fuzz/ \
+          ./build-fuzz/fuzz/velociloops_fuzzer \
+            fuzz/data/ \
             -max_total_time=60 \
             -max_len=980128 \
             -rss_limit_mb=512 \

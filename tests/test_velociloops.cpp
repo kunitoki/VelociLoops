@@ -12,6 +12,7 @@
 #include <iterator>
 #include <new>
 #include <numeric>
+#include <regex>
 #include <set>
 #include <string>
 #include <vector>
@@ -653,7 +654,8 @@ std::vector<uint8_t> buildSmallEncodedFile(int32_t channels = 1, bool withCreato
 
 TEST_CASE("utility functions expose stable strings")
 {
-    CHECK(std::string(vl_version_string()).find("velociloops ") == 0);
+    std::regex versionFormat(R"(\d+\.\d+\.\d+)");
+    CHECK(std::regex_match(vl_version_string(), versionFormat));
     CHECK(std::string(vl_error_string(VL_OK)) == "OK");
     CHECK(std::string(vl_error_string(VL_ERROR_INVALID_HANDLE)) == "invalid handle");
     CHECK(std::string(vl_error_string(VL_ERROR_INVALID_ARG)) == "invalid argument");
