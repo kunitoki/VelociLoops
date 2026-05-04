@@ -343,10 +343,9 @@ std::set<std::string> expectedOpenableContainers()
 {
     return {
         "100HasCreatorInfo.rx2", "100WeirdSampleRate.rx2",    "120AllMuted.rx2",          "120FourBeats.rx2",
-        "120Gated.rx2",          "120GatedMuted.rx2",         "120Mono copy.rx2",         "120Mono24Bits.rx2",
-        "120Mono.rx2",           "120SevenEights.rx2",        "120Stereo copy.rx2",       "120Stereo.rx2",
-        "120ThreeBeats.rx2",     "120TransmitAsOneSlice.rx2", "120RcyTest.rcy",           "120RexTest.rex",
-        "240FiveHundredSlices.rx2", "450OneHundredBars.rx2",
+        "120Gated.rx2",          "120GatedMuted.rx2",         "120Mono24Bits.rx2",        "120Mono.rx2",
+        "120SevenEights.rx2",    "120Stereo.rx2",             "120ThreeBeats.rx2",        "120TransmitAsOneSlice.rx2",
+        "120RcyTest.rcy",        "120RexTest.rex",            "240FiveHundredSlices.rx2", "450OneHundredBars.rx2",
     };
 }
 
@@ -832,10 +831,10 @@ TEST_CASE("WAV fixtures are valid PCM references")
     for (const fs::path& path : dataFiles())
     {
         if (path.extension() != ".wav")
-        {
             continue;
-        }
+
         CAPTURE(path.filename().string());
+
         WavInfo info;
         REQUIRE(readWavInfo(path, info));
         CHECK((info.channels == 1 || info.channels == 2));
@@ -845,7 +844,8 @@ TEST_CASE("WAV fixtures are valid PCM references")
         CHECK(info.dataBytes > 0);
         ++wavCount;
     }
-    CHECK(wavCount == 17);
+
+    CHECK(wavCount == 15);
 }
 
 TEST_CASE("mono slice rendering matches decoded DWOP trace after render offset")
@@ -1116,7 +1116,7 @@ TEST_CASE("all test data files are classified by the public opener")
 {
     const auto files = dataFiles();
     const auto expected = expectedOpenableContainers();
-    CHECK(files.size() == 40 + syntheticCorruptFixtures().size());
+    CHECK(files.size() == 36 + syntheticCorruptFixtures().size());
 
     int decodableCount = 0;
     int rejectedCount = 0;
