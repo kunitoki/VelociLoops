@@ -3497,5 +3497,5 @@ const char* vl_error_string(VLError err)
 
 const char* vl_version_string(void)
 {
-    return "velociloops 0.1.0";
+    return "0.2.0";
 }

@@ -340,7 +340,7 @@ typedef struct
 } VLSuperFluxOptions;
 
 /* -----------------------------------------------------------------------
-   Open / close
+   Open and decode existing files
    ----------------------------------------------------------------------- */
 
 /**
@@ -372,6 +372,10 @@ VLFile vl_open(const char* path, VLError* err);
  */
 VLFile vl_open_from_memory(const void* data, size_t size, VLError* err);
 
+/* -----------------------------------------------------------------------
+   Create empty file handle
+   ----------------------------------------------------------------------- */
+
 /**
  * @brief Create a new, empty file handle for assembling a REX2 loop.
  *
@@ -387,6 +391,10 @@ VLFile vl_open_from_memory(const void* data, size_t size, VLError* err);
  * @return             A valid VLFile handle, or NULL on failure.
  */
 VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLError* err);
+
+/* -----------------------------------------------------------------------
+   Create from onset detection
+   ----------------------------------------------------------------------- */
 
 /**
  * @brief Fill a VLSuperFluxOptions struct with the library defaults.
@@ -423,6 +431,10 @@ VLFile vl_create_from_superflux(int32_t channels,
                                 int32_t frames,
                                 const VLSuperFluxOptions* options,
                                 VLError* err);
+
+/* -----------------------------------------------------------------------
+   Close
+   ----------------------------------------------------------------------- */
 
 /**
  * @brief Release all resources associated with a VLFile handle.
@@ -671,7 +683,7 @@ const char* vl_error_string(VLError err);
 /**
  * @brief Return the library version string.
  *
- * Format: "velociloops MAJOR.MINOR.PATCH" (e.g. "velociloops 0.1.0").
+ * Format: "MAJOR.MINOR.PATCH" (e.g. "1.2.8").
  * The returned pointer is valid for the lifetime of the process.
  *
  * @return NUL-terminated ASCII version string.
