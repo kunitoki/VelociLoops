@@ -52,10 +52,10 @@ fuzz:
 format:
     clang-format --style=file -i include/*.h src/*.cpp tests/*.cpp
 
-visualize: generate
+visualize RX="tests/data/120Stereo.rx2": generate
     uv venv --allow-existing
     uv pip install --requirement scripts/requirements.txt
-    uv run scripts/visualize_rx2.py
+    uv run scripts/visualize_rx2.py {{RX}}
 
 bump:
     perl -0pi -e 's/x=(\d+)/"x=" . ($1 + 1)/ge' README.md

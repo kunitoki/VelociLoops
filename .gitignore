@@ -42,6 +42,7 @@
 
 # Folders
 .venv/
+.gitnexus/
 _build/
 build*/
 parking/

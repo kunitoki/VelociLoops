@@ -124,6 +124,39 @@ Optional creator and tag metadata from the REX2 CREI chunk.
 Absent fields are returned as empty strings (`""`).
 
 
+### `VLSuperFluxOptions`
+
+```c
+typedef struct { /* fields omitted */ } VLSuperFluxOptions;
+```
+
+Tunable parameters for `vl_create_from_superflux()`. Initialize with
+`vl_superflux_default_options()` and then override individual fields as needed.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `frame_size` | `int32_t` | 2048 | FFT/window size. Must be a power of two. |
+| `fps` | `int32_t` | 200 | Onset detection frames per second. |
+| `filter_bands` | `int32_t` | 24 | Log-frequency filter bands per octave. |
+| `max_bins` | `int32_t` | 3 | Frequency bins for SuperFlux maximum filtering. |
+| `diff_frames` | `int32_t` | 0 | Previous-frame distance; `<= 0` derives it from `ratio`. |
+| `min_slice_frames` | `int32_t` | 0 | Minimum samples between slice starts; `<= 0` uses 10 ms. |
+| `filter_equal` | `int32_t` | 0 | Non-zero normalizes triangular filter areas. |
+| `online` | `int32_t` | 0 | Non-zero uses causal framing and peak picking. |
+| `threshold` | `float` | 1.1 | Peak-picking threshold above the local average. |
+| `combine_ms` | `float` | 30 | Suppress detections within this many milliseconds. |
+| `pre_avg` | `float` | 0.15 | Seconds before peak for moving average. |
+| `pre_max` | `float` | 0.01 | Seconds before peak for moving maximum. |
+| `post_avg` | `float` | 0 | Seconds after peak for moving average. |
+| `post_max` | `float` | 0.05 | Seconds after peak for moving maximum. |
+| `delay_ms` | `float` | 0 | Detection timestamp offset in milliseconds. |
+| `ratio` | `float` | 0.5 | Window ratio used to derive `diff_frames`. |
+| `fmin` | `float` | 30 | Filterbank minimum frequency in Hz. |
+| `fmax` | `float` | 17000 | Filterbank maximum frequency in Hz. |
+| `log_mul` | `float` | 1 | Magnitude multiplier before `log10`. |
+| `log_add` | `float` | 1 | Positive value added before `log10`. |
+
+
 ## Functions
 
 ### Open / Close
@@ -196,6 +229,50 @@ first `vl_add_slice()` call; attempts to change metadata afterwards return
 | `channels` | 1 (mono) or 2 (stereo). |
 | `sample_rate` | Output sample rate in Hz. |
 | `tempo` | Playback tempo in BPM × 1000. |
+| `err` | Out-parameter for the status code. May be NULL. |
+
+**Returns** A valid `VLFile` on success, or `NULL` on failure.
+
+
+#### `vl_superflux_default_options`
+
+```c
+void vl_superflux_default_options(VLSuperFluxOptions* out);
+```
+
+Fill a caller-allocated `VLSuperFluxOptions` struct with the defaults used by
+`vl_create_from_superflux()`. Passing `NULL` is allowed and does nothing.
+
+
+#### `vl_create_from_superflux`
+
+```c
+VLFile vl_create_from_superflux(int32_t channels,
+                                int32_t sample_rate,
+                                int32_t tempo,
+                                const float* left,
+                                const float* right,
+                                int32_t frames,
+                                const VLSuperFluxOptions* options,
+                                VLError* err);
+```
+
+Create a new authoring handle from a complete mono or stereo loop. Stereo input
+is downmixed for SuperFlux onset detection, while the original left/right
+buffers are copied into the resulting slices. The returned handle can be saved
+with `vl_save()` or `vl_save_to_memory()`.
+
+**Parameters**
+
+| Name | Description |
+|------|-------------|
+| `channels` | 1 (mono) or 2 (stereo). |
+| `sample_rate` | Input/output sample rate in Hz. |
+| `tempo` | Playback tempo in BPM × 1000. |
+| `left` | Left or mono buffer containing `frames` float samples. |
+| `right` | Right buffer for stereo. Must be non-NULL when `channels == 2`. |
+| `frames` | Number of PCM frames in each input buffer. |
+| `options` | SuperFlux options, or NULL for defaults. |
 | `err` | Out-parameter for the status code. May be NULL. |
 
 **Returns** A valid `VLFile` on success, or `NULL` on failure.

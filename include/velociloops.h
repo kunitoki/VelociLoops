@@ -305,6 +305,40 @@ typedef struct
     char free_text[256]; /**< Arbitrary free-form text. */
 } VLCreatorInfo;
 
+/**
+ * @brief Tunable parameters for vl_create_from_superflux().
+ *
+ * Initialize with vl_superflux_default_options() before changing individual
+ * fields.  Pass NULL to vl_create_from_superflux() to use the same defaults.
+ *
+ * Time fields are seconds except @c combine_ms and @c delay_ms, which are
+ * milliseconds to match common onset-picking terminology.
+ */
+typedef struct
+{
+    int32_t frame_size;       /**< FFT/window size in samples. Must be a power of two. Default: 2048. */
+    int32_t fps;              /**< Onset detection frames per second. Default: 200. */
+    int32_t filter_bands;     /**< Log-frequency filter bands per octave. Default: 24. */
+    int32_t max_bins;         /**< Frequency bins for SuperFlux maximum filtering. Default: 3. */
+    int32_t diff_frames;      /**< Previous-frame distance; <= 0 derives it from @c ratio. */
+    int32_t min_slice_frames; /**< Minimum frames between slice starts. <= 0 uses 10 ms. */
+    int32_t filter_equal;     /**< Non-zero normalizes each triangular filter area. */
+    int32_t online;           /**< Non-zero uses causal framing and peak picking. */
+
+    float threshold;    /**< Peak-picking threshold over local average. Default: 1.1. */
+    float combine_ms;   /**< Suppress detections within this many ms. Default: 30. */
+    float pre_avg;      /**< Seconds before the peak for moving average. Default: 0.15. */
+    float pre_max;      /**< Seconds before the peak for moving maximum. Default: 0.01. */
+    float post_avg;     /**< Seconds after the peak for moving average. Default: 0.0. */
+    float post_max;     /**< Seconds after the peak for moving maximum. Default: 0.05. */
+    float delay_ms;     /**< Detection timestamp offset in ms. Default: 0. */
+    float ratio;        /**< Window ratio used to derive @c diff_frames. Default: 0.5. */
+    float fmin;         /**< Filterbank minimum frequency in Hz. Default: 30. */
+    float fmax;         /**< Filterbank maximum frequency in Hz. Default: 17000. */
+    float log_mul;      /**< Magnitude multiplier before log10. Default: 1. */
+    float log_add;      /**< Positive value added before log10. Default: 1. */
+} VLSuperFluxOptions;
+
 /* -----------------------------------------------------------------------
    Open / close
    ----------------------------------------------------------------------- */
@@ -353,6 +387,42 @@ VLFile vl_open_from_memory(const void* data, size_t size, VLError* err);
  * @return             A valid VLFile handle, or NULL on failure.
  */
 VLFile vl_create_new(int32_t channels, int32_t sample_rate, int32_t tempo, VLError* err);
+
+/**
+ * @brief Fill a VLSuperFluxOptions struct with the library defaults.
+ *
+ * @param out Pointer to caller-allocated options. NULL is ignored.
+ */
+void vl_superflux_default_options(VLSuperFluxOptions* out);
+
+/**
+ * @brief Create a sliced REX2 authoring handle from full-loop float PCM.
+ *
+ * The input is a complete mono or stereo loop as non-interleaved float buffers.
+ * VelociLoops downmixes stereo to mono for SuperFlux onset detection, then
+ * copies the original channel data into contiguous slices.  The returned handle
+ * is equivalent to one assembled with vl_create_new() and vl_add_slice(), and
+ * can be passed directly to vl_save() or vl_save_to_memory().
+ *
+ * @param channels     1 (mono) or 2 (stereo).
+ * @param sample_rate  Input/output sample rate in Hz.
+ * @param tempo        Playback tempo in BPM × 1000.
+ * @param left         Left or mono input buffer, @p frames samples.
+ * @param right        Right input buffer for stereo; must be non-NULL when
+ *                     @p channels is 2. Ignored for mono.
+ * @param frames       Number of PCM frames in each input buffer.
+ * @param options      SuperFlux parameters, or NULL for defaults.
+ * @param err          Receives the status code; may be NULL.
+ * @return             A valid VLFile handle ready to save, or NULL on failure.
+ */
+VLFile vl_create_from_superflux(int32_t channels,
+                                int32_t sample_rate,
+                                int32_t tempo,
+                                const float* left,
+                                const float* right,
+                                int32_t frames,
+                                const VLSuperFluxOptions* options,
+                                VLError* err);
 
 /**
  * @brief Release all resources associated with a VLFile handle.

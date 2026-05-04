@@ -435,6 +435,51 @@ void checkDecodedBuffer(const std::vector<float>& buffer)
                       }));
 }
 
+void addSyntheticOnset(std::vector<float>& left, std::vector<float>* right, size_t start)
+{
+    const size_t burstFrames = 768;
+    for (size_t i = 0; i < burstFrames && start + i < left.size(); ++i)
+    {
+        const float env = 1.0f - (float)i / (float)burstFrames;
+        const float value = std::sin((float)i * 0.58f) * env * 0.85f;
+        left[start + i] += value;
+        if (right)
+            (*right)[start + i] += std::cos((float)i * 0.43f) * env * 0.55f;
+    }
+}
+
+bool hasSliceNear(VLFile file, int32_t sliceCount, int32_t expectedStart, int32_t tolerance)
+{
+    for (int32_t i = 0; i < sliceCount; ++i)
+    {
+        VLSliceInfo slice = {};
+        if (vl_get_slice_info(file, i, &slice) == VL_OK && std::abs(slice.sample_start - expectedStart) <= tolerance)
+            return true;
+    }
+    return false;
+}
+
+void checkSliceMetadataMatches(VLFile expectedFile, VLFile actualFile, int32_t sliceCount, bool comparePpq)
+{
+    constexpr int32_t kSerializedFlags = VL_SLICE_FLAG_MUTED | VL_SLICE_FLAG_LOCKED | VL_SLICE_FLAG_SELECTED;
+
+    for (int32_t index = 0; index < sliceCount; ++index)
+    {
+        CAPTURE(index);
+        VLSliceInfo expected = {};
+        VLSliceInfo actual = {};
+        REQUIRE(vl_get_slice_info(expectedFile, index, &expected) == VL_OK);
+        REQUIRE(vl_get_slice_info(actualFile, index, &actual) == VL_OK);
+
+        if (comparePpq)
+            CHECK(actual.ppq_pos == expected.ppq_pos);
+        CHECK(actual.sample_start == expected.sample_start);
+        CHECK(actual.sample_length == expected.sample_length);
+        CHECK(actual.analysis_points == expected.analysis_points);
+        CHECK((actual.flags & kSerializedFlags) == (expected.flags & kSerializedFlags));
+    }
+}
+
 DecodedFile decodeWholeFile(VLFile file)
 {
     DecodedFile decoded;
@@ -659,6 +704,19 @@ TEST_CASE("invalid API arguments return errors")
     CHECK(vl_remove_slice(nullptr, 0) == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_save(nullptr, "out.rx2") == VL_ERROR_INVALID_HANDLE);
     CHECK(vl_save_to_memory(nullptr, nullptr, nullptr) == VL_ERROR_INVALID_HANDLE);
+
+    vl_superflux_default_options(nullptr);
+    float sample = 0.0f;
+    CHECK(vl_create_from_superflux(0, 44100, 120000, &sample, nullptr, 1, nullptr, &err) == nullptr);
+    CHECK(err == VL_ERROR_INVALID_ARG);
+    CHECK(vl_create_from_superflux(1, 7999, 120000, &sample, nullptr, 1, nullptr, &err) == nullptr);
+    CHECK(err == VL_ERROR_INVALID_SAMPLE_RATE);
+    CHECK(vl_create_from_superflux(1, 44100, 0, &sample, nullptr, 1, nullptr, &err) == nullptr);
+    CHECK(err == VL_ERROR_INVALID_TEMPO);
+    CHECK(vl_create_from_superflux(1, 44100, 120000, nullptr, nullptr, 1, nullptr, &err) == nullptr);
+    CHECK(err == VL_ERROR_INVALID_ARG);
+    CHECK(vl_create_from_superflux(2, 44100, 120000, &sample, nullptr, 1, nullptr, &err) == nullptr);
+    CHECK(err == VL_ERROR_INVALID_ARG);
 }
 
 TEST_CASE("malformed and patched containers cover parser edge cases")
@@ -1199,25 +1257,120 @@ TEST_CASE("every decodable fixture renders every slice and roundtrips through me
             checkInfoSane(info);
         }
 
-        size_t originalSize = 0;
-        REQUIRE(vl_save_to_memory(file.handle, nullptr, &originalSize) == VL_OK);
-        CHECK(originalSize == readFile(path).size());
+        size_t savedSize = 0;
+        REQUIRE(vl_save_to_memory(file.handle, nullptr, &savedSize) == VL_OK);
+        REQUIRE(savedSize > 64);
 
-        std::vector<uint8_t> shortOriginal(originalSize > 0 ? originalSize - 1 : 0);
-        size_t shortOriginalSize = shortOriginal.size();
-        CHECK(vl_save_to_memory(file.handle, shortOriginal.data(), &shortOriginalSize) == VL_ERROR_BUFFER_TOO_SMALL);
-        CHECK(shortOriginalSize == originalSize);
+        std::vector<uint8_t> shortSave(savedSize - 1);
+        size_t shortSaveSize = shortSave.size();
+        CHECK(vl_save_to_memory(file.handle, shortSave.data(), &shortSaveSize) == VL_ERROR_BUFFER_TOO_SMALL);
+        CHECK(shortSaveSize == savedSize);
 
-        std::vector<uint8_t> originalCopy(originalSize);
-        size_t copySize = originalCopy.size();
-        REQUIRE(vl_save_to_memory(file.handle, originalCopy.data(), &copySize) == VL_OK);
-        CHECK(originalCopy == readFile(path));
-        CHECK(vl_save_to_memory(file.handle, originalCopy.data(), nullptr) == VL_ERROR_INVALID_ARG);
+        std::vector<uint8_t> savedCopy(savedSize);
+        size_t copySize = savedCopy.size();
+        REQUIRE(vl_save_to_memory(file.handle, savedCopy.data(), &copySize) == VL_OK);
+        CHECK(copySize == savedSize);
+        CHECK(vl_save_to_memory(file.handle, savedCopy.data(), nullptr) == VL_ERROR_INVALID_ARG);
+
+        ScopedVLFile savedReopened(vl_open_from_memory(savedCopy.data(), savedCopy.size(), &err));
+        REQUIRE(savedReopened);
+        VLFileInfo savedInfo = {};
+        REQUIRE(vl_get_info(savedReopened.handle, &savedInfo) == VL_OK);
+        CHECK(savedInfo.channels == info.channels);
+        CHECK(savedInfo.sample_rate == info.sample_rate);
+        CHECK(savedInfo.slice_count == info.slice_count);
+        CHECK(savedInfo.total_frames == info.total_frames);
+        CHECK(savedInfo.loop_start == info.loop_start);
+        CHECK(savedInfo.loop_end == info.loop_end);
+        CHECK(savedInfo.tempo == info.tempo);
+        checkSliceMetadataMatches(file.handle, savedReopened.handle, info.slice_count, path.extension() != ".rex");
 
         if (expectedRenderableContainers().count(name) != 0)
         {
             roundtripByReencoding(decoded);
         }
+    }
+}
+
+TEST_CASE("SuperFlux authoring creates sliced mono and stereo files from full-loop floats")
+{
+    constexpr int32_t sampleRate = 44100;
+    constexpr int32_t frames = sampleRate * 2;
+    const std::vector<int32_t> expectedStarts = {0, sampleRate / 2, sampleRate, sampleRate + sampleRate / 2};
+
+    VLSuperFluxOptions options = {};
+    vl_superflux_default_options(&options);
+    options.threshold = 0.05f;
+    options.combine_ms = 90.0f;
+    options.min_slice_frames = sampleRate / 5;
+    options.post_max = 0.03f;
+
+    SUBCASE("mono")
+    {
+        std::vector<float> left((size_t)frames, 0.0f);
+        for (int32_t start : expectedStarts)
+            addSyntheticOnset(left, nullptr, (size_t)start);
+
+        VLError err = VL_OK;
+        ScopedVLFile file(vl_create_from_superflux(1, sampleRate, 120000, left.data(), nullptr, frames, &options, &err));
+        REQUIRE(file);
+        CHECK(err == VL_OK);
+
+        VLFileInfo info = {};
+        REQUIRE(vl_get_info(file.handle, &info) == VL_OK);
+        CHECK(info.channels == 1);
+        CHECK(info.sample_rate == sampleRate);
+        CHECK(info.total_frames == frames);
+        CHECK(info.loop_end == frames);
+        CHECK(info.transient_enabled == 0);
+        CHECK(info.slice_count >= (int32_t)expectedStarts.size());
+        for (int32_t expected : expectedStarts)
+            CHECK(hasSliceNear(file.handle, info.slice_count, expected, options.frame_size));
+
+        size_t size = 0;
+        REQUIRE(vl_save_to_memory(file.handle, nullptr, &size) == VL_OK);
+        std::vector<uint8_t> bytes(size);
+        REQUIRE(vl_save_to_memory(file.handle, bytes.data(), &size) == VL_OK);
+
+        ScopedVLFile reopened(vl_open_from_memory(bytes.data(), bytes.size(), &err));
+        REQUIRE(reopened);
+        VLFileInfo reopenedInfo = {};
+        REQUIRE(vl_get_info(reopened.handle, &reopenedInfo) == VL_OK);
+        CHECK(reopenedInfo.slice_count == info.slice_count);
+        CHECK(reopenedInfo.total_frames == frames);
+    }
+
+    SUBCASE("stereo")
+    {
+        std::vector<float> left((size_t)frames, 0.0f);
+        std::vector<float> right((size_t)frames, 0.0f);
+        for (int32_t start : expectedStarts)
+            addSyntheticOnset(left, &right, (size_t)start);
+
+        VLError err = VL_OK;
+        ScopedVLFile file(vl_create_from_superflux(2, sampleRate, 120000, left.data(), right.data(), frames, &options, &err));
+        REQUIRE(file);
+        CHECK(err == VL_OK);
+
+        VLFileInfo info = {};
+        REQUIRE(vl_get_info(file.handle, &info) == VL_OK);
+        CHECK(info.channels == 2);
+        CHECK(info.slice_count >= (int32_t)expectedStarts.size());
+        for (int32_t expected : expectedStarts)
+            CHECK(hasSliceNear(file.handle, info.slice_count, expected, options.frame_size));
+
+        const int32_t firstFrames = vl_get_slice_frame_count(file.handle, 0);
+        REQUIRE(firstFrames > 0);
+        std::vector<float> decodedLeft((size_t)firstFrames);
+        std::vector<float> decodedRight((size_t)firstFrames);
+        int32_t written = 0;
+        REQUIRE(vl_decode_slice(file.handle, 0, decodedLeft.data(), decodedRight.data(), 0, firstFrames, &written) == VL_OK);
+        CHECK(written == firstFrames);
+        CHECK(std::inner_product(decodedLeft.begin(), decodedLeft.end(), decodedRight.begin(), 0.0, std::plus<double>(),
+                                 [](float l, float r)
+                                 {
+                                     return std::fabs(l - r);
+                                 }) > 0.01);
     }
 }
 
