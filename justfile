@@ -25,8 +25,7 @@ coverage:
     ctest --test-dir build-coverage --output-on-failure --extra-verbose
     lcov -c -d build-coverage \
         --ignore-errors mismatch,unused,inconsistent,unsupported \
-        --include "$(pwd)/include/*" \
-        --include "$(pwd)/src/*.cpp" \
+        --include "*/src/*.cpp" \
         -o build-coverage/coverage.info
     lcov --summary build-coverage/coverage.info --ignore-errors inconsistent,unsupported
     genhtml build-coverage/coverage.info --ignore-errors category,inconsistent,unsupported -o build-coverage/coverage_html
