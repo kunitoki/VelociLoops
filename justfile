@@ -36,7 +36,7 @@ sanitize:
     cmake --build build-sanitize --parallel $(nproc)
     ctest --test-dir build-sanitize --output-on-failure --extra-verbose
 
-fuzz:
+fuzz TIME="30":
     cmake -S . -B build-fuzz -DCMAKE_BUILD_TYPE=Debug \
         -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
         -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
@@ -46,7 +46,7 @@ fuzz:
     ASAN_OPTIONS=halt_on_error=1:detect_leaks=0 \
     UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
         ./build-fuzz/fuzz/velociloops_fuzzer \
-        -max_total_time=30 -max_len=980128 -rss_limit_mb=512 -entropic=0 fuzz/data/ tests/data/
+        -max_total_time={{TIME}} -max_len=980128 -rss_limit_mb=512 -entropic=0 fuzz/data/ tests/data/
 
 format:
     clang-format --style=file -i include/*.h src/*.cpp tests/*.cpp
