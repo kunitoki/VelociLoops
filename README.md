@@ -157,6 +157,14 @@ VelociLoops output for `120Stereo.rx2`:
 
 ---
 
+## Using VelociLoops
+
+- [Bo-Shruriken](https://github.com/MrDorianJames/Bo-Shruriken)
+- [INTERSECT-rx2](https://github.com/cadecomposer/INTERSECT-rx2)
+- [rex-player](https://github.com/gorkulus/rex-player)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE).
